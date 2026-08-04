@@ -1,0 +1,59 @@
+name: Firmware compile check
+
+# Neither sketch has ever been flashed to real hardware -- there's no
+# ESP32 board available in this project's dev environment. This is
+# the next best thing: actually compile both against real ESP32 board
+# definitions and libraries on every push, so a broken include or API
+# mismatch is caught here instead of at someone's first real flash.
+
+on:
+  push:
+    paths:
+      - "firmware/**"
+      - ".github/workflows/firmware-compile.yml"
+  pull_request:
+    paths:
+      - "firmware/**"
+  workflow_dispatch:
+
+jobs:
+  irrigation-node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Install ESP32 board core
+        run: |
+          arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+          arduino-cli core install esp32:esp32 --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+
+      - name: Install libraries
+        run: |
+          arduino-cli lib install "DHT sensor library"
+          arduino-cli lib install "Adafruit Unified Sensor"
+          arduino-cli lib install "ArduinoJson"
+
+      - name: Compile irrigation_node
+        run: |
+          arduino-cli compile --fqbn esp32:esp32:esp32 firmware/irrigation_node
+
+  vision-node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Install ESP32 board core
+        run: |
+          arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+          arduino-cli core install esp32:esp32 --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+
+      - name: Install TFLite Micro library
+        run: arduino-cli lib install "Chirale_TensorFlowLite"
+
+      - name: Compile vision_node
+        run: |
+          arduino-cli compile --fqbn esp32:esp32:esp32cam firmware/vision_node

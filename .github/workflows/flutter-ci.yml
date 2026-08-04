@@ -1,0 +1,35 @@
+name: Flutter CI
+
+on:
+  push:
+    paths:
+      - "mobile_app/**"
+      - ".github/workflows/flutter-ci.yml"
+  pull_request:
+    paths:
+      - "mobile_app/**"
+  workflow_dispatch:
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile_app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.22.0"
+          channel: "stable"
+
+      # .env is gitignored (it holds the Gemini API key); CI needs a
+      # placeholder so `flutter pub get`/analyze/test don't fail on a
+      # missing asset. No real key needed for analyze/test.
+      - name: Create placeholder .env
+        run: cp .env.example .env
+
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
