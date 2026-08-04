@@ -7,6 +7,7 @@ Usage:
 """
 import pathlib
 import json
+import random
 
 import numpy as np
 import tensorflow as tf
@@ -22,20 +23,39 @@ with open(MODELS_DIR / "training_metadata.json") as f:
     metadata = json.load(f)
 
 IMG_SIZE = tuple(metadata["image_size"])
+SPOTCHECK_SEED = 42
+SPOTCHECK_PER_CLASS = 15
+
+
+def split_calibration_and_spotcheck(class_dir):
+    """Randomly partitions one class's images into (calibration, spot-check)
+    sets -- fixed seed so ordering is reproducible, not alphabetical.
+
+    Originally this took the *last 15 files alphabetically* per class as
+    the held-out spot-check set. That turned out to be a silent bug: it's
+    not a random sample, and PlantVillage's filenames aren't randomly
+    ordered within a class, so it was a biased slice, not a fair
+    evaluation set. Diagnosed by comparing float vs quantized per-class
+    accuracy on that slice -- they matched almost exactly (99.2% of
+    predictions identical), which proved quantization wasn't the problem;
+    the sampling was. See docs/dataset.md for the full story.
+    """
+    files = sorted(class_dir.glob("*.jpg"))
+    rng = random.Random(f"{SPOTCHECK_SEED}-{class_dir.name}")
+    shuffled = files[:]
+    rng.shuffle(shuffled)
+    spotcheck = shuffled[:SPOTCHECK_PER_CLASS]
+    calibration = shuffled[SPOTCHECK_PER_CLASS:]
+    return calibration, spotcheck
 
 
 def representative_dataset():
-    # 25/class (200 total) turned out to be too thin to calibrate INT8
-    # activation ranges well for an 8-class, 4-conv-block model -- it's
-    # what caused the ~18-point accuracy drop documented in
-    # docs/dataset.md. Using most of the training split per class
-    # instead (holding back the last 15/class, which is what
-    # convert_tflite.py's own spot-check below uses as a held-out set).
     count = 0
     for class_dir in sorted(DATA_DIR.iterdir()):
         if not class_dir.is_dir():
             continue
-        for img_path in list(class_dir.glob("*.jpg"))[:-15]:
+        calibration, _ = split_calibration_and_spotcheck(class_dir)
+        for img_path in calibration:
             img = keras.utils.load_img(img_path, target_size=IMG_SIZE)
             arr = keras.utils.img_to_array(img) / 255.0
             arr = np.expand_dims(arr, axis=0).astype(np.float32)
@@ -69,9 +89,11 @@ def main():
 
     correct = 0
     total = 0
+    per_class_accuracy = {}
     for class_idx, class_name in enumerate(metadata["class_names"]):
         class_dir = DATA_DIR / class_name
-        sample_paths = list(class_dir.glob("*.jpg"))[-15:]
+        _, sample_paths = split_calibration_and_spotcheck(class_dir)
+        class_correct = 0
         for img_path in sample_paths:
             img = keras.utils.load_img(img_path, target_size=IMG_SIZE)
             arr = keras.utils.img_to_array(img) / 255.0
@@ -85,13 +107,20 @@ def main():
             pred = int(np.argmax(out))
 
             total += 1
-            correct += int(pred == class_idx)
+            is_correct = int(pred == class_idx)
+            correct += is_correct
+            class_correct += is_correct
+
+        class_acc = class_correct / len(sample_paths) if sample_paths else 0.0
+        per_class_accuracy[class_name] = round(class_acc, 3)
+        print(f"  {class_name}: {class_correct}/{len(sample_paths)} ({class_acc:.1%})")
 
     quant_acc = correct / total if total else 0.0
     print(f"Quantized model spot-check accuracy on {total} held-out images: {quant_acc:.3f}")
 
     metadata["quantized_model_kb"] = round(size_kb, 1)
     metadata["quantized_spotcheck_accuracy"] = round(quant_acc, 3)
+    metadata["quantized_spotcheck_per_class_accuracy"] = per_class_accuracy
     metadata["input_quantization"] = {"scale": float(in_scale), "zero_point": int(in_zero_point)}
     with open(MODELS_DIR / "training_metadata.json", "w") as f:
         json.dump(metadata, f, indent=2)

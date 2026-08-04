@@ -86,13 +86,18 @@ Each component has its own setup:
 | Training data | 1,600 images, PlantVillage subset |
 | Model | Custom CNN, 96×96×3 input, 61K params |
 | Validation accuracy (float) | 69.7% |
-| Quantized (INT8) model | 69.9 KB, **51.7% spot-check accuracy** — a known, documented quantization gap, see [`docs/dataset.md`](docs/dataset.md) |
+| Quantized (INT8) model | 69.9 KB, 53.3% spot-check accuracy — quantization itself is ~lossless (99.2% prediction agreement with float); the real story is 2 of 8 classes the model hasn't learned well. Per-class breakdown in [`docs/dataset.md`](docs/dataset.md) |
 | Mobile app | 6 modules, verified via `flutter analyze` + `flutter test` (passing) |
+| CI | Both firmware sketches compile-checked on every push against real ESP32 board definitions; caught and fixed 2 real bugs |
 
-The quantized model's accuracy drop is real and not yet resolved —
-flagged rather than hidden. See
-[`docs/dataset.md`](docs/dataset.md#results) for what's going on and
-what to try next before relying on it in the field.
+The accuracy investigation is a good example of the standard this repo
+holds itself to: the first hypothesis (thin INT8 calibration data) was
+tested and ruled out, the real cause (a biased evaluation sample, not
+quantization) was found by actually comparing predictions image-by-
+image, and the underlying model weakness that was left after fixing
+the bug (two classes near chance level) is reported plainly rather
+than smoothed into a single "good enough" number. Full writeup:
+[`docs/dataset.md`](docs/dataset.md#results).
 
 ## License
 

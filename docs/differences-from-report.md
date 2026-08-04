@@ -18,11 +18,19 @@ PlantVillage dataset (200 images/class instead of ~15). **Actual
 measured result: 69.7% float validation accuracy** — well below the
 report's 94.1% F1, which came from a 120-image dataset (~15
 images/class) that's a strong candidate for overfitting to look
-better than it generalizes. After INT8 quantization for the
-microcontroller, accuracy drops further to 51.7% on a spot-check —
-a real, documented gap, not swept under the rug. See
-[`docs/dataset.md`](dataset.md#results) for the full numbers and what
-to try next.
+better than it generalizes.
+
+Quantized-model accuracy looked much worse at first (51.7%, an
+18-point drop) — investigated properly rather than assumed: it turned
+out to be a **biased evaluation sample**, not a quantization problem
+(image-by-image comparison showed float and quantized agreeing on
+99.2% of predictions). Fixed the sampling bug and re-measured: **53.3%
+overall**, with the honest per-class breakdown showing the model
+genuinely struggles on two specific classes (Spider Mite, Target Spot
+— both ~13%, near chance level) while doing well on others (Healthy
+100%, Septoria/TYLCV ~73%). See
+[`docs/dataset.md`](dataset.md#results) for the full investigation and
+per-class numbers.
 
 **One class had to be substituted entirely**: the report's "Bacterial
 Speck (*Pseudomonas syringae*)" has no equivalent in PlantVillage,
