@@ -25,11 +25,17 @@ IMG_SIZE = tuple(metadata["image_size"])
 
 
 def representative_dataset():
+    # 25/class (200 total) turned out to be too thin to calibrate INT8
+    # activation ranges well for an 8-class, 4-conv-block model -- it's
+    # what caused the ~18-point accuracy drop documented in
+    # docs/dataset.md. Using most of the training split per class
+    # instead (holding back the last 15/class, which is what
+    # convert_tflite.py's own spot-check below uses as a held-out set).
     count = 0
     for class_dir in sorted(DATA_DIR.iterdir()):
         if not class_dir.is_dir():
             continue
-        for img_path in list(class_dir.glob("*.jpg"))[:25]:
+        for img_path in list(class_dir.glob("*.jpg"))[:-15]:
             img = keras.utils.load_img(img_path, target_size=IMG_SIZE)
             arr = keras.utils.img_to_array(img) / 255.0
             arr = np.expand_dims(arr, axis=0).astype(np.float32)

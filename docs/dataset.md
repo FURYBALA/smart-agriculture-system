@@ -29,15 +29,25 @@ on-device.
 
 Full numbers: [`ml/models/training_metadata.json`](../ml/models/training_metadata.json).
 
-**Known issue, not hidden**: quantization dropped accuracy by ~18
+**Known issue, not hidden**: quantization drops accuracy by ~18
 points (69.7% -> 51.7%), a larger gap than you'd want in production.
-The representative dataset used for calibrating INT8 activation
-ranges was 25 images/class (200 total) — likely too little for an
-8-class, 4-conv-block model to calibrate well. If you're taking this
-further: try a larger/full representative dataset first, then check
-per-class quantized accuracy (an 18-point average drop could mean a
-few classes collapsed almost entirely while others held up fine), and
-consider quantization-aware training if that's not enough.
+
+**One fix already tried and ruled out**: the representative dataset
+used to calibrate INT8 activation ranges was originally 25
+images/class (200 total) — the obvious suspect for under-calibration.
+It was increased to 185/class (1,480 total, all training images minus
+the 15/class held out for the spot-check) and rerun. Result: **exact
+same 51.7%**, not a single point of improvement. That rules out "too
+little calibration data" as the cause — something else is behind the
+gap, most likely full-integer quantization itself being too aggressive
+for one or more layers in this specific architecture (the `Mean` op
+from `GlobalAveragePooling2D` and the final `Dense` layer are common
+culprits). If you're taking this further, next steps in order of
+likely payoff: check **per-class** quantized accuracy (an 18-point
+average drop could mean 2-3 classes collapsed to near-zero while
+others are fine — very different fix than a uniform degradation),
+then consider quantization-aware training if the per-class breakdown
+doesn't point to an obvious cause.
 
 This is well below the report's claimed 94.1% F1 — that number came
 from a 120-image dataset (96 train / 24 test, ~12-15 images per

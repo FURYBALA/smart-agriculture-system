@@ -92,8 +92,19 @@ void applyAutoIrrigationLogic() {
 
 void handleGetSensors() {
   JsonDocument doc;
-  doc["temperature"] = isnan(temperatureC) ? nullptr : temperatureC;
-  doc["humidity"] = isnan(humidityPct) ? nullptr : humidityPct;
+  // ArduinoJson's ternary assignment needs both branches to already be
+  // the same type -- `nullptr : float` doesn't compile. Set null and
+  // the real value on separate branches instead.
+  if (isnan(temperatureC)) {
+    doc["temperature"] = nullptr;
+  } else {
+    doc["temperature"] = temperatureC;
+  }
+  if (isnan(humidityPct)) {
+    doc["humidity"] = nullptr;
+  } else {
+    doc["humidity"] = humidityPct;
+  }
   doc["soilMoisture"] = soilMoisturePct;
   doc["pumpOn"] = pumpOn;
   doc["mode"] = currentMode == MODE_AUTO ? "auto" : "manual";

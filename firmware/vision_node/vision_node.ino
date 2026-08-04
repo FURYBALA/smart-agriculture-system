@@ -38,6 +38,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include "esp_camera.h"
+#include "esp_heap_caps.h"
 #include "camera_pins.h"
 #include "config.h"
 #include "model_data.h"
@@ -58,7 +59,13 @@ float latestConfidence = 0.0f;
 unsigned long latestAtMillis = 0;
 
 // ---- TFLite Micro globals ----
-alignas(16) static uint8_t tensor_arena[kTensorArenaSize];
+// The arena lives in PSRAM, not internal DRAM: a static/global array
+// this size (250 KB) plus WiFi/WebServer's own static buffers doesn't
+// fit in the ESP32's ~320 KB of internal DRAM -- confirmed by CI,
+// which caught a ~186 KB link-time DRAM overflow with this as a plain
+// static array. PSRAM is slower per-access than internal SRAM, but
+// for inference every few seconds that's a non-issue.
+uint8_t* tensor_arena = nullptr;
 const tflite::Model* model = nullptr;
 tflite::MicroInterpreter* interpreter = nullptr;
 TfLiteTensor* modelInput = nullptr;
@@ -69,6 +76,13 @@ TfLiteTensor* modelOutput = nullptr;
 tflite::MicroMutableOpResolver<5> resolver;
 
 bool setupModel() {
+  tensor_arena = static_cast<uint8_t*>(
+      heap_caps_malloc(kTensorArenaSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+  if (tensor_arena == nullptr) {
+    Serial.println("Failed to allocate tensor arena in PSRAM -- is PSRAM enabled in board settings?");
+    return false;
+  }
+
   model = tflite::GetModel(g_tomato_disease_model);
   if (model->version() != TFLITE_SCHEMA_VERSION) {
     MicroPrintf("Model schema version mismatch: model=%d supported=%d",
