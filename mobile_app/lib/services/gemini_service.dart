@@ -19,10 +19,18 @@ class GeminiService {
   late final GenerativeModel _chatModel;
   ChatSession? _chatSession;
 
+  // 'gemini-flash-lite-latest' is Google's rolling alias for the
+  // current lite flash model, not a pinned version -- deliberately
+  // chosen after 'gemini-1.5-flash' turned out to be already
+  // deprecated (confirmed by a live API call returning 404) and even
+  // 'gemini-2.5-flash'/'gemini-2.0-flash' were unavailable to this
+  // key (deprecated-for-new-users or zero free-tier quota,
+  // respectively). The alias avoids repeating this exact breakage the
+  // next time a dated model name gets sunset.
   GeminiService({required this.apiKey}) {
-    _visionModel = GenerativeModel(model: 'gemini-1.5-flash', apiKey: apiKey);
+    _visionModel = GenerativeModel(model: 'gemini-flash-lite-latest', apiKey: apiKey);
     _chatModel = GenerativeModel(
-      model: 'gemini-1.5-flash',
+      model: 'gemini-flash-lite-latest',
       apiKey: apiKey,
       systemInstruction: Content.text(
         'You are a plant-care assistant for a home gardening app. Only '
