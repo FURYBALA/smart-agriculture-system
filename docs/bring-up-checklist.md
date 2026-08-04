@@ -1,10 +1,16 @@
 # Bring-up checklist
 
-Nothing in this repo has been run on real hardware in the environment
-it was built in (no ESP32 toolchain, no physical boards, no Android/iOS
-emulator). Everything below was written carefully and reviewed against
-the correct APIs, but go through this checklist rather than assuming
-it just works.
+Nothing in this repo has been *flashed to real hardware* or run on a
+device/emulator in the environment it was built in (no physical ESP32
+boards, no Android/iOS emulator). What it does have: both firmware
+sketches are **compiled on every push** against real ESP32 board
+definitions and libraries via GitHub Actions (see the badges at the
+top of the main README) — this already caught and fixed two real
+bugs neither review nor local testing would have found (an ArduinoJson
+type error, and a DRAM overflow from allocating the vision model's
+tensor arena in the wrong memory region). So "compiles cleanly" is a
+verified fact, not a hope. "Behaves correctly on a real board" still
+isn't — go through this checklist rather than assuming that part.
 
 ## Irrigation node (`firmware/irrigation_node`)
 

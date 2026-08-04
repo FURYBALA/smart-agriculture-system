@@ -3,6 +3,9 @@
 A dual-node IoT + AI system: automated soil-moisture irrigation, and
 on-device + cloud plant disease diagnosis, unified in one mobile app.
 
+[![Firmware compile check](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/firmware-compile.yml/badge.svg)](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/firmware-compile.yml)
+[![Flutter CI](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/flutter-ci.yml/badge.svg)](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/flutter-ci.yml)
+
 Built for **21ECC301P — Microprocessor, Microcontroller and Interfacing
 Techniques**, SRM Institute of Science and Technology. See
 [`docs/team.md`](docs/team.md) for the team and guide.
