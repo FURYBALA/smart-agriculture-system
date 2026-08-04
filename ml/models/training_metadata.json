@@ -1,0 +1,25 @@
+{
+  "class_names": [
+    "Bacterial_Spot",
+    "Early_Blight",
+    "Healthy",
+    "Late_Blight",
+    "Septoria_Leaf_Spot",
+    "Spider_Mite",
+    "TYLCV",
+    "Target_Spot"
+  ],
+  "image_size": [
+    96,
+    96
+  ],
+  "val_accuracy": 0.6968749761581421,
+  "val_loss": 0.8040300607681274,
+  "epochs_trained": 30,
+  "quantized_model_kb": 69.9,
+  "quantized_spotcheck_accuracy": 0.517,
+  "input_quantization": {
+    "scale": 0.003921568859368563,
+    "zero_point": -128
+  }
+}

@@ -1,0 +1,172 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Smart Agriculture System -- cloud backend matching the architecture in
+  the project report (Figure 3.3): API Gateway -> S3 (image storage) ->
+  SQS -> Lambda inference -> DynamoDB (results + chat history).
+
+  Not deployed anywhere by default -- see backend/README.md. Deploying
+  this creates real billable AWS resources.
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: python3.12
+
+Resources:
+
+  # ---- Storage ----
+
+  LeafImageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "smart-agri-leaf-images-${AWS::AccountId}"
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireAfter90Days
+            Status: Enabled
+            ExpirationInDays: 90
+
+  DiagnosisResultsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: DiagnosisResults
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: diagnosisId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: diagnosisId
+          KeyType: HASH
+
+  ChatHistoryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ChatHistory
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: sessionId
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: sessionId
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+
+  InferenceQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: plant-disease-inference-queue
+      VisibilityTimeout: 60
+
+  # ---- API ----
+
+  SmartAgricultureApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type'"
+        AllowOrigin: "'*'"
+
+  # ---- Functions ----
+
+  UploadHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../lambda_functions/upload_handler/
+      Handler: app.handler
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref LeafImageBucket
+          QUEUE_URL: !Ref InferenceQueue
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref LeafImageBucket
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt InferenceQueue.QueueName
+      Events:
+        UploadApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref SmartAgricultureApi
+            Path: /diagnose
+            Method: post
+
+  InferenceHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../lambda_functions/inference_handler/
+      Handler: app.handler
+      MemorySize: 1024
+      Environment:
+        Variables:
+          RESULTS_TABLE: !Ref DiagnosisResultsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DiagnosisResultsTable
+        - S3ReadPolicy:
+            BucketName: !Ref LeafImageBucket
+        - SQSPollerPolicy:
+            QueueName: !GetAtt InferenceQueue.QueueName
+      Events:
+        QueueTrigger:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt InferenceQueue.Arn
+            BatchSize: 1
+
+  ResultsHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../lambda_functions/results_handler/
+      Handler: app.handler
+      Environment:
+        Variables:
+          RESULTS_TABLE: !Ref DiagnosisResultsTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref DiagnosisResultsTable
+      Events:
+        ResultsApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref SmartAgricultureApi
+            Path: /diagnose/{diagnosisId}
+            Method: get
+
+  ChatHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../lambda_functions/chat_handler/
+      Handler: app.handler
+      Environment:
+        Variables:
+          CHAT_TABLE: !Ref ChatHistoryTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ChatHistoryTable
+      Events:
+        ChatApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref SmartAgricultureApi
+            Path: /chat/{sessionId}
+            Method: get
+        ChatPostApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref SmartAgricultureApi
+            Path: /chat/{sessionId}
+            Method: post
+
+Outputs:
+  ApiUrl:
+    Description: Base URL for the deployed API
+    Value: !Sub "https://${SmartAgricultureApi}.execute-api.${AWS::Region}.amazonaws.com/prod/"
+  LeafImageBucketName:
+    Value: !Ref LeafImageBucket

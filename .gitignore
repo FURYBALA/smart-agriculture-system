@@ -1,0 +1,17 @@
+# ML dataset + Python
+ml/data/raw/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# AWS SAM build output
+backend/infrastructure/.aws-sam/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.iml
