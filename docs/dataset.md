@@ -2,7 +2,8 @@
 
 8-class subset of **PlantVillage** (Hughes & Salathe, 2015; mirrored
 at [spMohanty/PlantVillage-Dataset](https://github.com/spMohanty/PlantVillage-Dataset)),
-~200 images per class:
+400 images per class (each source class has ~1,000 available; started
+at 200, doubled after the investigation below):
 
 | Report's class name | PlantVillage source class | Notes |
 |---|---|---|
@@ -15,7 +16,7 @@ at [spMohanty/PlantVillage-Dataset](https://github.com/spMohanty/PlantVillage-Da
 | TYLCV | `Tomato___Tomato_Yellow_Leaf_Curl_Virus` | |
 | Target Spot | `Tomato___Target_Spot` | |
 
-80/20 train/validation split (1,280 train / 320 validation), images
+80/20 train/validation split (2,560 train / 640 validation), images
 resized to 96x96 to match the camera's native TinyML capture size
 on-device.
 
@@ -23,9 +24,9 @@ on-device.
 
 | | |
 |---|---|
-| Float model validation accuracy | 69.7% (30 epochs, no early stop, Keras's own shuffled 20% split) |
+| Float model validation accuracy | **81.9%** (30 epochs, no early stop, Keras's own shuffled 20% split) |
 | Quantized (INT8) model size | 69.9 KB |
-| Quantized spot-check accuracy | 53.3% (120 held-out images, random sample — see below) |
+| Quantized spot-check accuracy | **65.8%** (240 held-out images, random sample — see below) |
 
 Full numbers, including the per-class breakdown: [`ml/models/training_metadata.json`](../ml/models/training_metadata.json).
 
@@ -51,38 +52,51 @@ actually checking, not assuming:
    evaluation set the whole time. Fixed in
    [`ml/scripts/convert_tflite.py`](../ml/scripts/convert_tflite.py)
    to use a seeded random split instead
-   (`split_calibration_and_spotcheck`) — reran, got **53.3%** and,
-   more importantly, a per-class spread that finally means something.
+   (`split_calibration_and_spotcheck`) — reran, got 53.3% and, more
+   importantly, a per-class spread that finally meant something: two
+   classes (Spider Mite, Target Spot) at ~13%, near the ~12.5% you'd
+   expect from random guessing across 8 classes, while the other six
+   ranged 47-100%.
+4. **Fourth step — more data for the weak classes** (and all classes,
+   to keep the set balanced): each source class actually has ~1,000
+   images available; only 200 had been used. Doubled to 400/class
+   (3,200 total) and retrained from scratch, same architecture, same
+   hyperparameters — the only variable changed was dataset size.
+   Result: float accuracy **69.7% → 81.9%**, quantized **53.3% →
+   65.8%**. Real, substantial improvement from one change.
 
-### What the honest per-class numbers show
+### What the honest per-class numbers show (400 images/class)
 
 | Class | Accuracy |
 |---|---|
-| Healthy | 100.0% |
-| Septoria Leaf Spot | 73.3% |
-| TYLCV | 73.3% |
-| Early Blight | 60.0% |
-| Bacterial Spot | 46.7% |
-| Late Blight | 46.7% |
-| **Spider Mite** | **13.3%** |
-| **Target Spot** | **13.3%** |
+| Healthy | 86.7% |
+| TYLCV | 83.3% |
+| Septoria Leaf Spot | 80.0% |
+| Early Blight | 76.7% |
+| Bacterial Spot | 63.3% |
+| Late Blight | 53.3% |
+| **Spider Mite** | **40.0%** (was 13.3%) |
+| **Target Spot** | **43.3%** (was 13.3%) |
 
-This is not uniform degradation and it is not a quantization problem
-— it's the model genuinely failing on two specific classes (13.3% is
-close to the ~12.5% you'd expect from random guessing across 8
-classes), while doing reasonably to well on the other six. If
-you're extending this: look at what Spider Mite and Target Spot
-images actually look like (small/subtle symptoms are a common
-culprit for both), consider more training images or stronger
-augmentation specifically for those two classes, and check whether
-they're being confused with each other or with "Healthy" acting as a
-catch-all.
+More data helped every class, and roughly **tripled** the two
+previously near-chance classes — but didn't fully fix them. Spider
+Mite and Target Spot are still the two weakest classes by a wide
+margin, well below the 63-87% the other six now reach. This is no
+longer "the model hasn't learned these at all" (13%), it's "the model
+finds these two genuinely harder than the rest" (40-43%), which is a
+more normal, more fixable kind of gap. If you're extending this
+further: look at what Spider Mite and Target Spot images actually
+look like (small/subtle symptoms are a common culprit for both),
+check whether they're confused with each other or with a specific
+other class more than randomly, and consider whether those two
+specific classes need even more data, targeted augmentation, or
+simply are harder to distinguish from photos alone at this resolution.
 
-This whole result is well below the report's claimed 94.1% F1 — that
-number came from a 120-image dataset (96 train / 24 test, ~12-15
-images per class), which is a strong candidate for overfitting to
-look better than it generalizes. Take both numbers with the dataset
-sizes in mind.
+This whole result is still below the report's claimed 94.1% F1 —
+plausible, since that number came from a 120-image dataset (96 train
+/ 24 test, ~12-15 images per class), a strong candidate for
+overfitting to look better than it generalizes. Take both numbers
+with the dataset sizes in mind.
 
 ## Citation
 

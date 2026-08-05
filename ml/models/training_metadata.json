@@ -13,23 +13,23 @@
     96,
     96
   ],
-  "val_accuracy": 0.6968749761581421,
-  "val_loss": 0.8040300607681274,
+  "val_accuracy": 0.8187500238418579,
+  "val_loss": 0.5338770151138306,
   "epochs_trained": 30,
   "quantized_model_kb": 69.9,
-  "quantized_spotcheck_accuracy": 0.533,
+  "quantized_spotcheck_accuracy": 0.658,
+  "quantized_spotcheck_per_class_accuracy": {
+    "Bacterial_Spot": 0.633,
+    "Early_Blight": 0.767,
+    "Healthy": 0.867,
+    "Late_Blight": 0.533,
+    "Septoria_Leaf_Spot": 0.8,
+    "Spider_Mite": 0.4,
+    "TYLCV": 0.833,
+    "Target_Spot": 0.433
+  },
   "input_quantization": {
     "scale": 0.003921568859368563,
     "zero_point": -128
-  },
-  "quantized_spotcheck_per_class_accuracy": {
-    "Bacterial_Spot": 0.467,
-    "Early_Blight": 0.6,
-    "Healthy": 1.0,
-    "Late_Blight": 0.467,
-    "Septoria_Leaf_Spot": 0.733,
-    "Spider_Mite": 0.133,
-    "TYLCV": 0.733,
-    "Target_Spot": 0.133
   }
 }

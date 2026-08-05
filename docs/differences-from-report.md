@@ -14,21 +14,24 @@ Impulse project/export wasn't available when this repo was built.
 
 What's here instead: a CNN trained from scratch with TensorFlow/Keras
 on the same 8 disease classes, using a larger slice of the public
-PlantVillage dataset (200 images/class instead of ~15). **Actual
-measured result: 69.7% float validation accuracy** — well below the
+PlantVillage dataset (400 images/class instead of ~15). **Actual
+measured result: 81.9% float validation accuracy** — still below the
 report's 94.1% F1, which came from a 120-image dataset (~15
 images/class) that's a strong candidate for overfitting to look
 better than it generalizes.
 
-Quantized-model accuracy looked much worse at first (51.7%, an
-18-point drop) — investigated properly rather than assumed: it turned
-out to be a **biased evaluation sample**, not a quantization problem
-(image-by-image comparison showed float and quantized agreeing on
-99.2% of predictions). Fixed the sampling bug and re-measured: **53.3%
-overall**, with the honest per-class breakdown showing the model
-genuinely struggles on two specific classes (Spider Mite, Target Spot
-— both ~13%, near chance level) while doing well on others (Healthy
-100%, Septoria/TYLCV ~73%). See
+Quantized-model accuracy looked much worse at first (51.7% on a
+120-image spot-check, an 18-point drop from float) — investigated
+properly rather than assumed: it turned out to be a **biased
+evaluation sample** (an alphabetically-last-15-files slice, not
+random), not a quantization problem — image-by-image comparison
+showed float and quantized agreeing on 99.2% of predictions. Fixed
+the sampling bug, which surfaced the real issue: two classes (Spider
+Mite, Target Spot) were stuck near chance level (~13%) while the other
+six did fine. Doubled the training data (200→400 images/class) as a
+direct response — quantized accuracy went **53.3% → 65.8%** overall,
+and the two weak classes roughly tripled (13% → 40-43%) without fully
+closing the gap to the rest. See
 [`docs/dataset.md`](dataset.md#results) for the full investigation and
 per-class numbers.
 

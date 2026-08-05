@@ -83,10 +83,10 @@ Each component has its own setup:
 | | |
 |---|---|
 | Disease classes | 8 tomato leaf conditions (see [`docs/dataset.md`](docs/dataset.md)) |
-| Training data | 1,600 images, PlantVillage subset |
+| Training data | 3,200 images, PlantVillage subset (400/class) |
 | Model | Custom CNN, 96×96×3 input, 61K params |
-| Validation accuracy (float) | 69.7% |
-| Quantized (INT8) model | 69.9 KB, 53.3% spot-check accuracy — quantization itself is ~lossless (99.2% prediction agreement with float); the real story is 2 of 8 classes the model hasn't learned well. Per-class breakdown in [`docs/dataset.md`](docs/dataset.md) |
+| Validation accuracy (float) | **81.9%** |
+| Quantized (INT8) model | 69.9 KB, **65.8% spot-check accuracy** — quantization itself is ~lossless (99.2% prediction agreement with float); 2 of 8 classes (Spider Mite, Target Spot) are still the model's weak point at 40-43%, up from ~13% before doubling the dataset. Per-class breakdown in [`docs/dataset.md`](docs/dataset.md) |
 | Mobile app | 6 modules, verified via `flutter analyze` + `flutter test` (passing) |
 | CI | Both firmware sketches compile-checked on every push against real ESP32 board definitions; caught and fixed 2 real bugs |
 
@@ -94,9 +94,11 @@ The accuracy investigation is a good example of the standard this repo
 holds itself to: the first hypothesis (thin INT8 calibration data) was
 tested and ruled out, the real cause (a biased evaluation sample, not
 quantization) was found by actually comparing predictions image-by-
-image, and the underlying model weakness that was left after fixing
-the bug (two classes near chance level) is reported plainly rather
-than smoothed into a single "good enough" number. Full writeup:
+image, and once that bug was fixed, the underlying model weakness it
+had been hiding (two classes near chance level) got a real fix
+attempt — doubling the dataset — that measurably helped (both classes
+roughly tripled) without fully closing the gap. Reported at every
+step, including where it's still short. Full writeup:
 [`docs/dataset.md`](docs/dataset.md#results).
 
 ## License

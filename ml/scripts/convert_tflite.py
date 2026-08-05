@@ -24,7 +24,9 @@ with open(MODELS_DIR / "training_metadata.json") as f:
 
 IMG_SIZE = tuple(metadata["image_size"])
 SPOTCHECK_SEED = 42
-SPOTCHECK_PER_CLASS = 15
+SPOTCHECK_PER_CLASS = 30  # was 15 -- too coarse to read (each image
+# swung per-class accuracy by 6.7 points); doubled now that there's
+# more data per class to spare
 
 
 def split_calibration_and_spotcheck(class_dir):

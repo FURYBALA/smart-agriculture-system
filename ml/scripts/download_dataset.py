@@ -15,7 +15,11 @@ import urllib.error
 import json
 
 REPO = "spMohanty/PlantVillage-Dataset"
-IMAGES_PER_CLASS = 200
+IMAGES_PER_CLASS = 400  # each class has ~1000 available; 200 was the
+# first attempt -- doubled after the trained model showed near-chance
+# accuracy (~13%) on 2 of 8 classes (Spider Mite, Target Spot), a
+# likely symptom of too little data for those specific classes. See
+# docs/dataset.md for the accuracy investigation this follows from.
 
 CLASSES = {
     "Tomato___healthy": "Healthy",
