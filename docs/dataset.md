@@ -83,14 +83,47 @@ previously near-chance classes — but didn't fully fix them. Spider
 Mite and Target Spot are still the two weakest classes by a wide
 margin, well below the 63-87% the other six now reach. This is no
 longer "the model hasn't learned these at all" (13%), it's "the model
-finds these two genuinely harder than the rest" (40-43%), which is a
-more normal, more fixable kind of gap. If you're extending this
-further: look at what Spider Mite and Target Spot images actually
-look like (small/subtle symptoms are a common culprit for both),
-check whether they're confused with each other or with a specific
-other class more than randomly, and consider whether those two
-specific classes need even more data, targeted augmentation, or
-simply are harder to distinguish from photos alone at this resolution.
+finds these two genuinely harder than the rest" (40-43%).
+
+### Fifth step — tried, and rejected based on the result
+
+Obvious next idea: since each source class has ~1,000 images
+available, max out data for just the two weak classes (1,000 each)
+while leaving the other six at 400, and retrain. Tried it. **The
+result was worse, not better, and is not shipped:**
+
+| Class | 400/class (shipped) | 1,000/class for Spider Mite + Target Spot only |
+|---|---|---|
+| Bacterial Spot | 63.3% | 40.0% (**-23.3**) |
+| Early Blight | 76.7% | 76.7% |
+| Healthy | 86.7% | 90.0% |
+| Late Blight | 53.3% | 36.7% (**-16.7**) |
+| Septoria Leaf Spot | 80.0% | 90.0% |
+| Spider Mite | 40.0% | 40.0% (no change, despite +600 images) |
+| TYLCV | 83.3% | 76.7% (**-6.7**) |
+| Target Spot | 43.3% | 53.3% (+10.0) |
+| **Overall** | **65.8%** | **62.9%** |
+
+Skewing the dataset 2.5x toward two classes measurably hurt three of
+the six classes whose data never changed (Bacterial Spot and Late
+Blight worst-hit), while only partially helping the intended targets
+— Target Spot gained 10 points, but Spider Mite gained nothing at all
+from 600 extra images. Most likely cause: with `categorical_crossentropy`
+and no class weighting, overrepresenting two classes shifts the
+model's decision boundaries in their favor at other classes' expense,
+which is exactly what the drop pattern looks like. **The 400/class
+balanced model (this repo's shipped version) stayed the better
+result**, and this asymmetric-data experiment was reverted rather
+than merged.
+
+If you're extending this further, better next moves than "add more
+data to just the weak classes": try class-weighted loss (tells the
+model to weight Spider Mite/Target Spot mistakes more without
+touching the data balance), look at what those two classes' images
+actually look like (small/subtle symptoms are a common culprit for
+both), or check whether they're being confused with each other or
+with a specific other class more than randomly — that would point at
+a feature/architecture limitation rather than a data one.
 
 This whole result is still below the report's claimed 94.1% F1 —
 plausible, since that number came from a 120-image dataset (96 train
