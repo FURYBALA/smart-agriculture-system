@@ -154,19 +154,63 @@ helped, and it didn't.
 result and the one shipped.** Two different, reasonable attempts to
 close the Spider Mite / Target Spot gap have now been tried and both
 made things worse — that's a real signal this specific gap won't move
-with training-recipe tweaks alone. If you're extending this further:
-actually look at what those two classes' images contain (small/subtle
-symptoms are a common culprit for both — worth checking by eye
-whether they're harder for a human to tell apart too), check the full
-confusion matrix for what they're being mistaken for, or consider a
-different architecture/input resolution before trying more loss or
-data tweaks on this one.
+with training-recipe tweaks alone.
+
+### Seventh step — root cause, via confusion matrix
+
+Rather than guess a third training-recipe tweak, looked at what the
+model actually confuses these two classes *with*. Ran the full 8x8
+confusion matrix on a held-out sample (30 images/class) and it's not
+what "two hard classes" usually looks like:
+
+- **Spider Mite**: only 4/30 misclassifications go to Target Spot (the
+  other weak class) — but **14/30 go to Septoria Leaf Spot**.
+- **Target Spot**: only 1/30 goes to Spider Mite — but **16/30 go to
+  Septoria Leaf Spot**.
+- **Septoria Leaf Spot** is meanwhile the single best-predicted class
+  in the whole model (29/30, essentially no errors of its own).
+
+So Spider Mite and Target Spot aren't confused with each other, and
+they're not scattered randomly across all 8 classes either (which
+would suggest generically weak, noisy features). They're both
+specifically pulled into one look-alike class. All three are
+leaf-**spot**-pattern diseases visually, and at 96x96 resolution the
+model appears to have learned an overly broad "spotted leaf" feature
+that Septoria Leaf Spot dominates, absorbing the other two spot-type
+diseases into it. That's a genuine architecture/resolution limitation,
+not something more data or loss weighting on the same 4-conv-block
+CNN was ever going to fix — which is consistent with why both of the
+last two experiments failed.
+
+**Where this leaves it**: closing this gap further needs a
+qualitatively different intervention than what's been tried — e.g. a
+model with more capacity or a different receptive-field structure
+specifically for texture/pattern discrimination, a higher input
+resolution than 96x96 (trades off against the ESP32-CAM's memory
+budget — see `docs/bring-up-checklist.md`), or explicit
+Septoria-vs-Spider-Mite/Target-Spot hard-negative training. None of
+that is a quick retrain, so it's documented here as the identified
+cause rather than attempted blind. The shipped model's honest
+numbers (81.9% float / 65.8% quantized, this specific confusion
+pattern) are the final result of this investigation.
 
 This whole result is still below the report's claimed 94.1% F1 —
 plausible, since that number came from a 120-image dataset (96 train
 / 24 test, ~12-15 images per class), a strong candidate for
 overfitting to look better than it generalizes. Take both numbers
 with the dataset sizes in mind.
+
+**Reproducibility note**: a retrain during the confusion-matrix
+diagnostic, using the identical script, data, and seed as the shipped
+model, came out at 74.5% validation accuracy — about 7 points below
+the shipped model's 81.9% on the same setup. Both `SEED=42` values
+control the *dataset* shuffle/split, not TensorFlow's own op-level
+nondeterminism on CPU (thread scheduling, floating-point reduction
+order), so different runs can land in different local optima even
+with everything else held constant. Don't be surprised if you retrain
+from these scripts and don't land on exactly 81.9% — the qualitative
+findings above (which classes are weak, what they're confused with)
+are more load-bearing than the exact decimal.
 
 ## Citation
 
