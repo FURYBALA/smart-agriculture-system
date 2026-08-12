@@ -1,16 +1,38 @@
-# plant_doctor
+# Plant Doctor (mobile app)
 
-A new Flutter project.
+Flutter app for the Smart Agriculture System — see the
+[repo root README](../README.md) for the full project. This app is
+the unified control surface for both ESP32 nodes and the AI diagnosis
+features:
 
-## Getting Started
+- **Sensor Dashboard** — live temperature/humidity/soil moisture from
+  the irrigation node
+- **Irrigation Control** — manual/automatic mode, pump on/off
+- **Disease Diagnosis** — photo diagnosis via Gemini Vision, or poll
+  the vision node's on-device result
+- **History** — local log of past diagnoses and sensor snapshots
+- **Chatbot** — domain-restricted plant-care assistant (Gemini)
+- **Device Tests** — connectivity check for both ESP32 nodes
 
-This project is a starting point for a Flutter application.
+## Setup
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+flutter pub get
+cp .env.example .env   # fill in your Gemini API key and node IPs
+flutter run
+```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+See [`../docs/bring-up-checklist.md`](../docs/bring-up-checklist.md)
+for full setup details, and [`../docs/wiring.md`](../docs/wiring.md)
+for the ESP32 hardware this app talks to.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Verified, not just written
+
+```bash
+flutter analyze   # clean
+flutter test      # passing
+```
+
+Both run automatically in CI on every push (see the badge on the repo
+root README). Hasn't been run on a physical device/emulator in the
+environment this was built in — see the root README for that caveat.

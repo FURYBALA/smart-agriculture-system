@@ -90,13 +90,18 @@ diagram describes. See [`backend/README.md`](../backend/README.md).
 
 ## What's still unverified
 
-- **Neither firmware sketch has been compiled or flashed to real
-  hardware** — this environment had no ESP32 toolchain or physical
-  board. Both were written carefully against the correct APIs and
-  reviewed, but see
-  [`docs/bring-up-checklist.md`](bring-up-checklist.md) before your
-  first flash.
-- **The Flutter app hasn't run on a device or emulator** — no
-  Android/iOS emulator was available here. Static analysis and the
-  widget test suite pass, which is a real (if partial) signal, but
-  it's not the same as seeing it run.
+- **Both firmware sketches compile cleanly — verified, not assumed.**
+  GitHub Actions CI compiles `firmware/irrigation_node` and
+  `firmware/vision_node` against real ESP32 board definitions and
+  libraries on every push (badges at the top of the main README) —
+  this actually caught and fixed 2 real bugs (an ArduinoJson type
+  error, and the vision model's tensor arena overflowing internal
+  DRAM). What's still unverified is **flashing to physical hardware**
+  — no ESP32 or ESP32-CAM board was available in this environment.
+  See [`docs/bring-up-checklist.md`](bring-up-checklist.md) before
+  your first flash.
+- **The Flutter app compiles and passes its checks — verified, not
+  assumed.** `flutter analyze` (clean) and `flutter test` (passing)
+  run in CI on every push. What's still unverified is **running on an
+  actual device or emulator** — no Android/iOS emulator, Chrome, or
+  Visual Studio C++ toolchain was available here to launch it.

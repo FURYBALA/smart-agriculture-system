@@ -22,7 +22,7 @@ SOFTWARE.
 
 ---
 
-Note: the tomato/apple disease training datasets used in this project
-are subsets of PlantVillage (Hughes & Salathe, 2015), separately
-licensed by its original authors. See docs/dataset.md for attribution.
-This license covers the original code in this repository only.
+Note: the tomato disease training dataset used in this project is a
+subset of PlantVillage (Hughes & Salathe, 2015), separately licensed
+by its original authors. See docs/dataset.md for attribution. This
+license covers the original code in this repository only.
