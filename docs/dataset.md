@@ -116,14 +116,51 @@ balanced model (this repo's shipped version) stayed the better
 result**, and this asymmetric-data experiment was reverted rather
 than merged.
 
-If you're extending this further, better next moves than "add more
-data to just the weak classes": try class-weighted loss (tells the
-model to weight Spider Mite/Target Spot mistakes more without
-touching the data balance), look at what those two classes' images
-actually look like (small/subtle symptoms are a common culprit for
-both), or check whether they're being confused with each other or
-with a specific other class more than randomly — that would point at
-a feature/architecture limitation rather than a data one.
+### Sixth step — also tried, also rejected, worse than the fifth
+
+Next candidate: class-weighted loss. Same balanced 400/class dataset
+(the extra Spider Mite / Target Spot images from step five were moved
+out, not deleted, and the data restored to exactly 400/class first —
+isolating loss weighting as the only variable this time). Gave Spider
+Mite and Target Spot 2x weight in `categorical_crossentropy` via
+Keras's `class_weight`, otherwise identical architecture and
+hyperparameters. **Result: worse than either prior version, including
+for the two classes it was meant to help:**
+
+| Class | 400/class (shipped) | 2x class-weighted (same data) |
+|---|---|---|
+| Bacterial Spot | 63.3% | 30.0% (-33.3) |
+| Early Blight | 76.7% | 53.3% (-23.4) |
+| Healthy | 86.7% | 80.0% (-6.7) |
+| Late Blight | 53.3% | 20.0% (-33.3) |
+| Septoria Leaf Spot | 80.0% | 90.0% (+10.0) |
+| **Spider Mite** | **40.0%** | **16.7% (-23.3)** |
+| TYLCV | 83.3% | 76.7% (-6.6) |
+| **Target Spot** | **43.3%** | **30.0% (-13.3)** |
+| **Overall** | **65.8%** | **49.6%** |
+
+Both target classes got *worse*, not better — the opposite of the
+hypothesis. Validation accuracy oscillated heavily between epochs
+during training (e.g. 0.68 → 0.48 → 0.59 → 0.57 → 0.52 across five
+consecutive epochs) rather than converging, which points at 2x
+weighting on 2 of 8 classes destabilizing optimization at this
+dataset size and learning rate, not a validated fix. This result also
+argues against "class imbalance, not class difficulty" as the
+explanation for step five's failure — if that were the whole story,
+correcting for it via loss weighting instead of data skew should have
+helped, and it didn't.
+
+**The 400/class balanced model, no class weighting, remains the best
+result and the one shipped.** Two different, reasonable attempts to
+close the Spider Mite / Target Spot gap have now been tried and both
+made things worse — that's a real signal this specific gap won't move
+with training-recipe tweaks alone. If you're extending this further:
+actually look at what those two classes' images contain (small/subtle
+symptoms are a common culprit for both — worth checking by eye
+whether they're harder for a human to tell apart too), check the full
+confusion matrix for what they're being mistaken for, or consider a
+different architecture/input resolution before trying more loss or
+data tweaks on this one.
 
 This whole result is still below the report's claimed 94.1% F1 —
 plausible, since that number came from a 120-image dataset (96 train
