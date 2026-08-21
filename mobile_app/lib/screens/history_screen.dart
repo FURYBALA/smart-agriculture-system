@@ -46,12 +46,21 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
 
   Future<void> _refreshDiagnoses() async {
     setState(_reloadDiagnoses);
-    await _diagnosesFuture;
+    // Swallow here, not propagate: RefreshIndicator.onRefresh rethrowing
+    // leaves its spinner in an inconsistent state. The FutureBuilder
+    // below still sees the same (now-errored) future and renders the
+    // error UI -- this just lets the pull-to-refresh gesture complete
+    // cleanly instead of crashing out of it.
+    try {
+      await _diagnosesFuture;
+    } catch (_) {}
   }
 
   Future<void> _refreshSnapshots() async {
     setState(_reloadSnapshots);
-    await _snapshotsFuture;
+    try {
+      await _snapshotsFuture;
+    } catch (_) {}
   }
 
   @override
@@ -75,6 +84,9 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
             child: FutureBuilder<List<DiagnosisResult>>(
               future: _diagnosesFuture,
               builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return _ErrorList(message: 'Could not load history: ${snapshot.error}');
+                }
                 if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
                 final items = snapshot.data!;
                 if (items.isEmpty) {
@@ -116,6 +128,9 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
             child: FutureBuilder<List<SensorReading>>(
               future: _snapshotsFuture,
               builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return _ErrorList(message: 'Could not load sensor log: ${snapshot.error}');
+                }
                 if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
                 final items = snapshot.data!;
                 if (items.isEmpty) {
@@ -148,6 +163,34 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Kept scrollable (AlwaysScrollableScrollPhysics) so pull-to-refresh
+/// still works from an error state, not just from a loaded list.
+class _ErrorList extends StatelessWidget {
+  final String message;
+  const _ErrorList({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 80, 24, 24),
+          child: Column(
+            children: [
+              Icon(Icons.error_outline, size: 40, color: Theme.of(context).colorScheme.error),
+              const SizedBox(height: 12),
+              Text(message, textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              const Text('Pull down to retry.', style: TextStyle(color: Colors.grey)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

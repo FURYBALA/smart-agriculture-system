@@ -41,6 +41,13 @@ def handler(event, context):
     except (KeyError, json.JSONDecodeError):
         return json_response(400, {"error": "expected JSON body with imageBase64"})
 
+    # b64decode raises TypeError (not caught below) if imageBase64 is
+    # valid JSON but not a string -- e.g. a client sending the number
+    # 12345 instead of a base64 string. Reject that explicitly rather
+    # than relying on the decode call to catch every wrong input shape.
+    if not isinstance(image_b64, str):
+        return json_response(400, {"error": "imageBase64 must be a string"})
+
     try:
         image_bytes = base64.b64decode(image_b64, validate=True)
     except (binascii.Error, ValueError):

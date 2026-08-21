@@ -43,6 +43,16 @@ unsigned long pumpStartedAt = 0;
 unsigned long pumpLastFinishedAt = 0;
 unsigned long lastSensorReadAt = 0;
 
+// Tracks *who* turned the pump on, not the current mode -- gating the
+// safety timer on currentMode alone has a hole: AUTO starts the pump,
+// then the user switches to MANUAL mid-cycle before the timer fires.
+// currentMode is now MANUAL, so a mode-only check would stop applying
+// the cutoff and the pump would run forever until someone notices.
+// Tracking the pump's own origin means the auto-started pump still
+// gets shut off on schedule regardless of any mode switch in between,
+// while a manually-started pump is still never subject to the timer.
+bool pumpStartedByAuto = false;
+
 void setPumpOutput(bool on) {
   bool level = RELAY_ACTIVE_LOW ? !on : on;
   digitalWrite(RELAY_PIN, level ? HIGH : LOW);
@@ -55,15 +65,16 @@ void startPump() {
   if (pumpLastFinishedAt != 0 && sinceLastRun < PUMP_COOLDOWN_MS) return;
   setPumpOutput(true);
   pumpStartedAt = millis();
+  pumpStartedByAuto = true;
 }
 
-// Auto-cutoff safety timer -- only applies to pumps started by the
-// AUTO-mode watering cycle (startPump()). Manual mode gives the user
-// direct on/off control via the REST API with no hidden timer; a
-// pump started manually is stopped only by an explicit /pump/off
-// call, not by this timer.
+// Auto-cutoff safety timer -- only applies to a pump that was started
+// by the AUTO-mode watering cycle (startPump()), tracked via
+// pumpStartedByAuto rather than the current mode (see comment above).
+// A pump started manually via /pump/on is stopped only by an explicit
+// /pump/off call, never by this timer.
 void servicePumpTimer() {
-  if (!pumpOn || currentMode != MODE_AUTO) return;
+  if (!pumpOn || !pumpStartedByAuto) return;
   if (millis() - pumpStartedAt >= PUMP_RUN_MS) {
     setPumpOutput(false);
     pumpLastFinishedAt = millis();
@@ -156,6 +167,7 @@ void handlePumpOn() {
     return;
   }
   setPumpOutput(true);
+  pumpStartedByAuto = false;  // explicit user control -- never subject to the auto safety timer
   server.send(200, "application/json", "{\"pumpOn\":true}");
 }
 

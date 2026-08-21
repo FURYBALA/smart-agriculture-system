@@ -18,6 +18,7 @@ import io
 import json
 import logging
 import os
+from decimal import Decimal
 
 import boto3
 import numpy as np
@@ -85,7 +86,14 @@ def _run_one(table, diagnosis_id, bucket, key):
         "diagnosisId": diagnosis_id,
         "status": "complete",
         "diseaseName": CLASS_LABELS[best_idx],
-        "confidence": float(probs[best_idx]),
+        # DynamoDB's TypeSerializer rejects native Python float outright
+        # ("Float types are not supported. Use Decimal types instead.")
+        # -- this was a pre-existing bug that made this write fail on
+        # every single successful inference, not just corrupt-image
+        # edge cases. Convert via str() first, not Decimal(float)
+        # directly, to avoid inheriting float's binary-representation
+        # artifacts (e.g. Decimal(0.1) != Decimal("0.1")).
+        "confidence": Decimal(str(probs[best_idx])),
     })
 
 
