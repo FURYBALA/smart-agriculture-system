@@ -45,12 +45,27 @@ step) precisely because it wasn't obvious in advance whether it would
 work.
 
 **What was not verified:** actually running the built output in a
-browser and clicking through screens. `flutter run -d edge` was
-attempted and the dart2js compile step alone took ~45+ seconds before
-this environment's tooling limits made it impractical to wait through a
-full launch-and-interact cycle, and there's no browser-automation
-tooling here (no chromedriver/Selenium/Playwright) to observe console
-output or screen state without a human watching the window. So:
+browser and observing it. Two real attempts, both with concrete,
+specific outcomes -- not left untried:
+
+1. `flutter run -d edge` -- the dart2js compile step alone took ~45+
+   seconds before this environment's tooling limits made it impractical
+   to wait through a full launch-and-interact cycle.
+2. Serving `build/web` locally (`python -m http.server`) and using
+   Edge's own headless CLI flags
+   (`msedge --headless=new --screenshot=... http://127.0.0.1:8123/`) to
+   capture a screenshot without needing Selenium/Playwright. This did
+   **not** produce an isolated headless render of the app: it launched
+   full interactive Edge under the environment's real default profile
+   instead (confirmed from the process log -- it opened
+   `copilot.microsoft.com`, the profile's normal new-tab page, not the
+   target URL), spawning ~40 browser processes. No screenshot was
+   produced. Killed and cleaned up rather than fought further with
+   different flags -- this is a concrete, observed limitation of this
+   specific Edge installation's headless mode in this environment, not
+   an assumption that browser observation is impossible in general.
+
+So:
 
 - Whether `HistoryScreen` (which opens a `sqflite` database via
   `HistoryDatabase`, and is kept mounted at all times by `HomeShell`'s
