@@ -27,6 +27,7 @@
 #include <ArduinoJson.h>
 #include <DHT.h>
 #include "config.h"
+#include "irrigation_logic.h"
 
 DHT dht(DHT_PIN, DHT_TYPE);
 WebServer server(HTTP_SERVER_PORT);
@@ -38,47 +39,38 @@ float temperatureC = NAN;
 float humidityPct = NAN;
 int soilMoisturePct = 0;
 
-bool pumpOn = false;
-unsigned long pumpStartedAt = 0;
-unsigned long pumpLastFinishedAt = 0;
+// Pump on/off state and timing live in irrigation_logic::PumpState; the
+// actual start/stop *decisions* (canStartPump, shouldAutoCutoff, etc.)
+// are pure functions in irrigation_logic.h so they can be exercised by a
+// host-side test (firmware/test/test_irrigation_logic.cpp) without an
+// ESP32 board. This .ino only supplies the real clock (millis()) and the
+// real hardware I/O (digitalWrite) around those decisions.
+irrigation_logic::PumpState pump;
 unsigned long lastSensorReadAt = 0;
-
-// Tracks *who* turned the pump on, not the current mode -- gating the
-// safety timer on currentMode alone has a hole: AUTO starts the pump,
-// then the user switches to MANUAL mid-cycle before the timer fires.
-// currentMode is now MANUAL, so a mode-only check would stop applying
-// the cutoff and the pump would run forever until someone notices.
-// Tracking the pump's own origin means the auto-started pump still
-// gets shut off on schedule regardless of any mode switch in between,
-// while a manually-started pump is still never subject to the timer.
-bool pumpStartedByAuto = false;
 
 void setPumpOutput(bool on) {
   bool level = RELAY_ACTIVE_LOW ? !on : on;
   digitalWrite(RELAY_PIN, level ? HIGH : LOW);
-  pumpOn = on;
+  pump.pumpOn = on;
 }
 
 void startPump() {
-  if (pumpOn) return;
-  unsigned long sinceLastRun = millis() - pumpLastFinishedAt;
-  if (pumpLastFinishedAt != 0 && sinceLastRun < PUMP_COOLDOWN_MS) return;
+  if (!irrigation_logic::canStartPump(pump, millis(), PUMP_COOLDOWN_MS)) return;
   setPumpOutput(true);
-  pumpStartedAt = millis();
-  pumpStartedByAuto = true;
+  pump.pumpStartedAt = millis();
+  pump.pumpStartedByAuto = true;
 }
 
 // Auto-cutoff safety timer -- only applies to a pump that was started
 // by the AUTO-mode watering cycle (startPump()), tracked via
-// pumpStartedByAuto rather than the current mode (see comment above).
-// A pump started manually via /pump/on is stopped only by an explicit
-// /pump/off call, never by this timer.
+// pump.pumpStartedByAuto rather than the current mode (see
+// irrigation_logic.h's PumpState comment). A pump started manually via
+// /pump/on is stopped only by an explicit /pump/off call, never by this
+// timer.
 void servicePumpTimer() {
-  if (!pumpOn || !pumpStartedByAuto) return;
-  if (millis() - pumpStartedAt >= PUMP_RUN_MS) {
-    setPumpOutput(false);
-    pumpLastFinishedAt = millis();
-  }
+  if (!irrigation_logic::shouldAutoCutoff(pump, millis(), PUMP_RUN_MS)) return;
+  setPumpOutput(false);
+  pump.pumpLastFinishedAt = millis();
 }
 
 void readSensors() {
@@ -90,17 +82,16 @@ void readSensors() {
   }
 
   int raw = analogRead(SOIL_PIN);
-  long pct = map(raw, SOIL_RAW_DRY, SOIL_RAW_WET, 0, 100);
-  soilMoisturePct = constrain((int)pct, 0, 100);
+  soilMoisturePct = irrigation_logic::convertSoilRawToPercent(raw, SOIL_RAW_DRY, SOIL_RAW_WET);
 }
 
 void applyAutoIrrigationLogic() {
   if (currentMode != MODE_AUTO) return;
-  if (soilMoisturePct < SOIL_DRY_THRESHOLD_PCT) {
+  if (irrigation_logic::shouldAutoStart(soilMoisturePct, SOIL_DRY_THRESHOLD_PCT)) {
     startPump();
-  } else if (soilMoisturePct >= SOIL_WET_THRESHOLD_PCT && pumpOn) {
+  } else if (irrigation_logic::shouldAutoStop(soilMoisturePct, SOIL_WET_THRESHOLD_PCT, pump.pumpOn)) {
     setPumpOutput(false);
-    pumpLastFinishedAt = millis();
+    pump.pumpLastFinishedAt = millis();
   }
 }
 
@@ -122,7 +113,7 @@ void handleGetSensors() {
     doc["humidity"] = humidityPct;
   }
   doc["soilMoisture"] = soilMoisturePct;
-  doc["pumpOn"] = pumpOn;
+  doc["pumpOn"] = pump.pumpOn;
   doc["mode"] = currentMode == MODE_AUTO ? "auto" : "manual";
 
   String out;
@@ -167,7 +158,7 @@ void handlePumpOn() {
     return;
   }
   setPumpOutput(true);
-  pumpStartedByAuto = false;  // explicit user control -- never subject to the auto safety timer
+  pump.pumpStartedByAuto = false;  // explicit user control -- never subject to the auto safety timer
   server.send(200, "application/json", "{\"pumpOn\":true}");
 }
 
@@ -177,7 +168,7 @@ void handlePumpOff() {
     return;
   }
   setPumpOutput(false);
-  pumpLastFinishedAt = millis();
+  pump.pumpLastFinishedAt = millis();
   server.send(200, "application/json", "{\"pumpOn\":false}");
 }
 
@@ -230,7 +221,7 @@ void loop() {
     applyAutoIrrigationLogic();
     Serial.printf("Temp: %.1f C | Humidity: %.1f %% | Soil: %d %% | Pump: %s | Mode: %s\n",
                   temperatureC, humidityPct, soilMoisturePct,
-                  pumpOn ? "ON" : "OFF",
+                  pump.pumpOn ? "ON" : "OFF",
                   currentMode == MODE_AUTO ? "auto" : "manual");
   }
 

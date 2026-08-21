@@ -57,3 +57,26 @@ jobs:
       - name: Compile vision_node
         run: |
           arduino-cli compile --fqbn esp32:esp32:esp32cam firmware/vision_node
+
+  host-logic-tests:
+    # Compiles and runs firmware/test/*.cpp against the hardware-independent
+    # logic headers (irrigation_logic.h, vision_logic.h) with the runner's
+    # plain g++ -- no ESP32 board, no Arduino toolchain. This is real
+    # execution of real production logic (pump state machine, thresholds,
+    # timer-origin tracking, RGB565 decode, INT8 quantize/dequantize,
+    # argmax), not a compile-only check. See docs/host-testing.md.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and run irrigation_logic host test
+        run: |
+          g++ -std=c++17 -Wall -Wextra -I firmware/irrigation_node \
+            firmware/test/test_irrigation_logic.cpp -o test_irrigation_logic
+          ./test_irrigation_logic
+
+      - name: Build and run vision_logic host test
+        run: |
+          g++ -std=c++17 -Wall -Wextra -I firmware/vision_node \
+            firmware/test/test_vision_logic.cpp -o test_vision_logic
+          ./test_vision_logic

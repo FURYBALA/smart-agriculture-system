@@ -43,6 +43,7 @@
 #include "config.h"
 #include "model_data.h"
 #include "class_labels.h"
+#include "vision_logic.h"
 
 #include <tensorflow/lite/micro/micro_interpreter.h>
 #include <tensorflow/lite/micro/micro_mutable_op_resolver.h>
@@ -144,23 +145,20 @@ void preprocessFrame(camera_fb_t* fb) {
   // esp32-camera's RGB565 output is big-endian per pixel (high byte
   // first), not the Xtensa core's native little-endian -- reading it
   // through a uint16_t* cast byte-swaps every pixel. Combine the two
-  // bytes explicitly instead.
+  // bytes explicitly instead. The actual unpack/normalize/quantize math
+  // lives in vision_logic.h so it can be host-tested (see
+  // firmware/test/test_vision_logic.cpp) without a camera or a TFLite
+  // Micro build.
   const uint8_t* bytes = fb->buf;
   const int pixelCount = kInputWidth * kInputHeight;
 
   for (int i = 0; i < pixelCount; i++) {
-    uint16_t p = (static_cast<uint16_t>(bytes[i * 2]) << 8) | bytes[i * 2 + 1];
-    uint8_t r5 = (p >> 11) & 0x1F;
-    uint8_t g6 = (p >> 5) & 0x3F;
-    uint8_t b5 = p & 0x1F;
+    vision_logic::RgbNormalized rgb =
+        vision_logic::decodeRgb565BigEndian(bytes[i * 2], bytes[i * 2 + 1]);
 
-    float rNorm = (r5 * 255) / 31.0f / 255.0f;
-    float gNorm = (g6 * 255) / 63.0f / 255.0f;
-    float bNorm = (b5 * 255) / 31.0f / 255.0f;
-
-    modelInput->data.int8[i * 3 + 0] = static_cast<int8_t>(rNorm / kInputScale + kInputZeroPoint);
-    modelInput->data.int8[i * 3 + 1] = static_cast<int8_t>(gNorm / kInputScale + kInputZeroPoint);
-    modelInput->data.int8[i * 3 + 2] = static_cast<int8_t>(bNorm / kInputScale + kInputZeroPoint);
+    modelInput->data.int8[i * 3 + 0] = vision_logic::quantizeChannel(rgb.r, kInputScale, kInputZeroPoint);
+    modelInput->data.int8[i * 3 + 1] = vision_logic::quantizeChannel(rgb.g, kInputScale, kInputZeroPoint);
+    modelInput->data.int8[i * 3 + 2] = vision_logic::quantizeChannel(rgb.b, kInputScale, kInputZeroPoint);
   }
 }
 
@@ -182,19 +180,11 @@ void runInference() {
   const float outScale = modelOutput->params.scale;
   const int outZeroPoint = modelOutput->params.zero_point;
 
-  int bestIdx = 0;
-  float bestProb = -1.0f;
-  for (int i = 0; i < kNumClasses; i++) {
-    int8_t raw = modelOutput->data.int8[i];
-    float prob = (raw - outZeroPoint) * outScale;
-    if (prob > bestProb) {
-      bestProb = prob;
-      bestIdx = i;
-    }
-  }
+  vision_logic::Prediction pred = vision_logic::argmaxDequantized(
+      modelOutput->data.int8, kNumClasses, outScale, outZeroPoint);
 
-  latestClass = kClassLabels[bestIdx];
-  latestConfidence = bestProb;
+  latestClass = kClassLabels[pred.classIndex];
+  latestConfidence = pred.confidence;
   latestAtMillis = millis();
 
   Serial.printf("Prediction: %s  (%.1f%% confidence)\n", latestClass.c_str(), latestConfidence * 100.0f);
