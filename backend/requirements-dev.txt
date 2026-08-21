@@ -2,3 +2,9 @@
 # See docs/backend-local-testing.md.
 pytest
 moto[s3,sqs,dynamodb]
+
+# Same runtime deps as lambda_functions/inference_handler/requirements.txt,
+# needed here to actually run the real model against test images.
+numpy
+pillow
+ai-edge-litert

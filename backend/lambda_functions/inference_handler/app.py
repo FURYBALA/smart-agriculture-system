@@ -23,7 +23,16 @@ from decimal import Decimal
 import boto3
 import numpy as np
 from PIL import Image
-import tflite_runtime.interpreter as tflite
+
+# tflite_runtime -- what this originally used -- has been pulled from
+# PyPI entirely (confirmed: `pip index versions tflite-runtime` returns
+# no distributions at all, not just none for this platform). Google's
+# replacement package is ai-edge-litert, a drop-in-compatible successor
+# (same Interpreter constructor/method names) -- switched to that here,
+# not just documented as a known-broken dependency, since the old one
+# would fail to install anywhere today, not only in this dev
+# environment. See docs/backend-local-testing.md.
+from ai_edge_litert.interpreter import Interpreter
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -51,7 +60,7 @@ _interpreter = None
 def _get_interpreter():
     global _interpreter
     if _interpreter is None:
-        _interpreter = tflite.Interpreter(model_path=MODEL_PATH)
+        _interpreter = Interpreter(model_path=MODEL_PATH)
         _interpreter.allocate_tensors()
     return _interpreter
 

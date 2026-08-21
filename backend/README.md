@@ -50,11 +50,13 @@ Flutter app --GET/POST /chat/{sessionId}--> API Gateway --> chat_handler --> Dyn
    to match the exact order in `ml/models/training_metadata.json`
    (`class_names`) -- getting this order wrong silently mislabels every
    prediction.
-3. **`tflite-runtime` packaging**: it ships native binaries that must
-   match Lambda's execution environment (manylinux, correct
-   architecture). `sam build` with a container (`sam build --use-container`)
-   handles this correctly; installing the wheel locally on Windows/macOS
-   and zipping it up will not work.
+3. **`ai-edge-litert` packaging** (the TFLite interpreter package this
+   uses -- see the note in `app.py`: the original `tflite-runtime`
+   package has been removed from PyPI entirely): it ships native
+   binaries that must match Lambda's execution environment (manylinux,
+   correct architecture). `sam build` with a container
+   (`sam build --use-container`) handles this correctly; installing the
+   wheel locally on Windows/macOS and zipping it up will not work.
 
 ## Deploying
 
@@ -87,5 +89,8 @@ the real Lambda handler code exercised directly against
 pip install -r requirements-dev.txt
 python -m pytest tests/ -v
 ```
-16 tests, all passing. Full account of what was checked this way, what
-wasn't, and exactly why: [`docs/backend-local-testing.md`](../docs/backend-local-testing.md).
+19 tests, all passing -- including real inference through the actual
+shipped model (`ai-edge-litert`, not the removed `tflite-runtime`
+package, does install locally). Full account of what was checked this
+way, what wasn't, and exactly why:
+[`docs/backend-local-testing.md`](../docs/backend-local-testing.md).
