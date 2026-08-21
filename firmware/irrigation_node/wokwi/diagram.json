@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "author": "Smart Agriculture System",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp32", "top": 0, "left": 0, "attrs": {} },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht",
+      "top": -60,
+      "left": 80,
+      "attrs": { "temperature": "27", "humidity": "55" }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "soil_pot",
+      "top": 40,
+      "left": 80,
+      "attrs": { "label": "soil moisture stand-in (see note below)" }
+    },
+    { "type": "wokwi-led", "id": "pump_led", "top": 100, "left": 80, "attrs": { "color": "blue", "label": "pump (via relay)" } },
+    { "type": "wokwi-resistor", "id": "r1", "top": 100, "left": 130, "attrs": { "value": "220" } }
+  ],
+  "connections": [
+    ["esp32:D4", "dht:SDA", "green", ["v0"]],
+    ["dht:VCC", "esp32:3V3", "red", ["v0"]],
+    ["dht:GND", "esp32:GND.1", "black", ["v0"]],
+
+    ["esp32:D34", "soil_pot:SIG", "yellow", ["v0"]],
+    ["soil_pot:VCC", "esp32:3V3", "red", ["v0"]],
+    ["soil_pot:GND", "esp32:GND.2", "black", ["v0"]],
+
+    ["esp32:D27", "r1:1", "orange", ["v0"]],
+    ["r1:2", "pump_led:A", "orange", ["v0"]],
+    ["pump_led:C", "esp32:GND.3", "black", ["v0"]]
+  ],
+  "dependencies": {}
+}
