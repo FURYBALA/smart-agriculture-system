@@ -135,24 +135,50 @@ Real problems found and fixed, not just features written:
 - **Quantization**: post-training INT8, converted to a 69.9 KB TFLite
   file for TFLite Micro on the ESP32-CAM; the same `.tflite` file is
   reused by the optional cloud inference Lambda.
-- **Results**: 81.9% float validation accuracy, 65.8% quantized
-  spot-check accuracy (240 held-out images). These are dataset
-  evaluation figures from held-out PlantVillage images, **not a
-  measurement of real-world field accuracy** — real garden photos have
-  cluttered backgrounds and lighting PlantVillage's cropped,
-  plain-background images don't.
+
+## Project results
+
+Documented evaluation results from model development — measured on
+held-out PlantVillage images during training and quantization, **not
+a measurement of real-world field accuracy**. Real garden photos have
+cluttered backgrounds and lighting that PlantVillage's cropped,
+plain-background images don't.
+
+- **Validation accuracy (float model)**: **81.9%**
+- **Quantized (INT8) model**: 69.9 KB, **65.8%** spot-check accuracy
+  on 240 held-out images
+- **Float-vs-quantized prediction agreement**: **99.2%** — confirms
+  the accuracy gap between float and quantized was not caused by
+  quantization itself (see methodology below)
+- **Spider Mite / Target Spot improvement**: both classes went from
+  ~13% (near chance level for an 8-class problem) to **40.0%** and
+  **43.3%** respectively after doubling their training data — a real,
+  measured improvement, though both remain the two weakest of the
+  eight classes
+
+**Methodology.** Quantized accuracy initially looked far worse than
+float — an ~18-point drop. Rather than assume quantization was the
+cause, float and quantized predictions were compared image-by-image:
+99.2% agreement ruled quantization out. The actual cause was a biased
+evaluation sample (an alphabetically-last-N slice of files, not a
+random one). Fixing the sampling exposed the real issue underneath it:
+two classes stuck near chance level. Doubling their training data was
+tried as a direct remediation and measurably improved both. Two
+further attempts to close the remaining gap — an imbalanced
+1,000-image oversample, and class-weighted loss — were tried and both
+made results *worse*, and are documented rather than discarded. Full
+step-by-step writeup, per-class accuracy tables, and the
+confusion-matrix root-cause analysis:
+[`docs/dataset.md`](docs/dataset.md#results).
 
 ## Known limitations
 
-- **Spider Mite (40.0%) and Target Spot (43.3%) remain weak classes**
-  — well below the other six (63–90%). Root-caused via confusion
-  matrix: both diseases' visual features overlap heavily with
-  Septoria Leaf Spot specifically (not with each other), which looks
-  like an architectural/feature-resolution limit rather than a
-  fixable data or training bug. Two follow-up experiments (an
-  imbalanced 1,000-image oversample, and class-weighted loss) were
-  tried and both made results *worse* — documented rather than
-  discarded, in [`docs/dataset.md`](docs/dataset.md#results).
+- **Spider Mite and Target Spot remain the model's weakest classes**
+  (40.0% / 43.3%, vs. 63–90% for the other six — see Project results
+  above). Root-caused via confusion matrix: both diseases' visual
+  features overlap heavily with Septoria Leaf Spot specifically (not
+  with each other), which looks like an architectural/
+  feature-resolution limit rather than a fixable data or training bug.
 - **PlantVillage vs. real-world images.** The model has not been
   evaluated on photos taken in an actual garden; expect a real
   accuracy drop until fine-tuned on real deployment images (noted in
