@@ -71,8 +71,21 @@ creating anything.
 
 ## Local testing without AWS
 
+**With Docker** (not available in this project's dev environment --
+untested here, but this is the standard SAM workflow):
 ```bash
 sam local start-api
 ```
 Runs the API Gateway + Lambda locally via Docker for testing the HTTP
 contract before deploying for real.
+
+**Without Docker** -- what this repo actually has: `sam validate`,
+`sam build` for three of the four functions plus the shared layer, and
+the real Lambda handler code exercised directly against
+`moto`-mocked S3/SQS/DynamoDB:
+```bash
+pip install -r requirements-dev.txt
+python -m pytest tests/ -v
+```
+16 tests, all passing. Full account of what was checked this way, what
+wasn't, and exactly why: [`docs/backend-local-testing.md`](../docs/backend-local-testing.md).

@@ -29,6 +29,12 @@ Resources:
       CompatibleRuntimes:
         - python3.12
       RetentionPolicy: Delete
+    Metadata:
+      # Without this, `sam build` (and `sam build CommonLayer` on its
+      # own) doesn't know how to build the layer and fails with
+      # "Build method missing in layer CommonLayer" -- found by actually
+      # running `sam build` locally, not assumed.
+      BuildMethod: python3.12
 
   # ---- Storage ----
 

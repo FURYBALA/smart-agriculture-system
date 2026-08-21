@@ -1,0 +1,4 @@
+# Local testing only -- not deployed with the Lambda functions.
+# See docs/backend-local-testing.md.
+pytest
+moto[s3,sqs,dynamodb]
