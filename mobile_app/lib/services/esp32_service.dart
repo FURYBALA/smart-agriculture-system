@@ -22,7 +22,17 @@ class Esp32Service {
     if (res.statusCode != 200) {
       throw Esp32Exception('Sensor read failed (${res.statusCode})');
     }
-    return SensorReading.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+    try {
+      return SensorReading.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+    } catch (e) {
+      // A truncated/corrupted body (a flaky Wi-Fi hop, a partial read)
+      // throws FormatException or a cast error, not Esp32Exception --
+      // wrap it so callers that only branch on Esp32Exception (and
+      // screens that interpolate the caught error straight into UI
+      // text, e.g. sensor_dashboard_screen.dart) get one consistent,
+      // readable exception type instead of a raw parser stack trace.
+      throw Esp32Exception('Sensor read failed: invalid response from the irrigation node');
+    }
   }
 
   Future<String> fetchMode() async {
@@ -30,7 +40,11 @@ class Esp32Service {
     if (res.statusCode != 200) {
       throw Esp32Exception('Mode read failed (${res.statusCode})');
     }
-    return (jsonDecode(res.body) as Map<String, dynamic>)['mode'] as String;
+    try {
+      return (jsonDecode(res.body) as Map<String, dynamic>)['mode'] as String;
+    } catch (e) {
+      throw Esp32Exception('Mode read failed: invalid response from the irrigation node');
+    }
   }
 
   Future<void> setMode(String mode) async {
@@ -50,8 +64,17 @@ class Esp32Service {
     final path = on ? '/pump/on' : '/pump/off';
     final res = await http.post(_irrigationUri(path)).timeout(_timeout);
     if (res.statusCode != 200) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>?;
-      throw Esp32Exception(body?['error'] as String? ?? 'Pump command failed');
+      // Best-effort: use the node's {"error": "..."} body for a specific
+      // message (e.g. "switch to manual mode first"), but a malformed
+      // error body must not itself crash out with a FormatException --
+      // fall back to a generic message instead.
+      String? serverMessage;
+      try {
+        serverMessage = (jsonDecode(res.body) as Map<String, dynamic>?)?['error'] as String?;
+      } catch (_) {
+        serverMessage = null;
+      }
+      throw Esp32Exception(serverMessage ?? 'Pump command failed (${res.statusCode})');
     }
   }
 
@@ -68,13 +91,17 @@ class Esp32Service {
     if (res.statusCode != 200) {
       throw Esp32Exception('Vision node read failed (${res.statusCode})');
     }
-    final json = jsonDecode(res.body) as Map<String, dynamic>;
-    return (
-      diseaseClass: json['class'] as String,
-      confidence: (json['confidence'] as num).toDouble(),
-      ageMs: (json['ageMs'] as num).toInt(),
-      hasResult: json['hasResult'] as bool? ?? false,
-    );
+    try {
+      final json = jsonDecode(res.body) as Map<String, dynamic>;
+      return (
+        diseaseClass: json['class'] as String,
+        confidence: (json['confidence'] as num).toDouble(),
+        ageMs: (json['ageMs'] as num).toInt(),
+        hasResult: json['hasResult'] as bool? ?? false,
+      );
+    } catch (e) {
+      throw Esp32Exception('Vision node read failed: invalid response from the vision node');
+    }
   }
 
   /// Used by the ESP32 Connectivity Testing screen.
