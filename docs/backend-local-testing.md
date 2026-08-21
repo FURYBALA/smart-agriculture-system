@@ -103,14 +103,19 @@ actually install here (unlike the old `tflite-runtime`):
   this specific test) is what turns that into a `status: "failed"`
   DynamoDB write for the real Lambda entry point.
 
-### Backend CI (`.github/workflows/backend-ci.yml`)
+### Backend CI (`.github/workflows/backend-ci.yml`) -- confirmed, not assumed
 
 GitHub's `ubuntu-latest` runners have Docker, which this local machine
 doesn't. CI runs the same `pytest` suite plus `sam build
 --use-container` for the *entire* stack, including
 `InferenceHandlerFunction` -- the one function that can't build locally.
-Check the workflow's latest run for the current result rather than
-trusting this doc to stay current on that specific claim.
+Checked the actual run rather than assuming it would pass: both jobs
+succeeded, and the build log shows `Build Succeeded` for
+`InferenceHandlerFunction` specifically, with `ai-edge-litert-2.2.0-cp312-cp312-manylinux_2_27_x86_64.whl`
+resolving cleanly inside the container. So `sam build --use-container`
+for the complete stack is now real, CI-verified evidence, not a
+documented-but-unexercised claim -- check the workflow's latest run to
+confirm it's still current.
 
 ## What was NOT verified, anywhere
 
