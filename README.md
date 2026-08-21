@@ -1,14 +1,16 @@
 # Smart Agriculture System with Plant Disease Detection
 
 A dual-node IoT + AI system: automated soil-moisture irrigation, and
-on-device + cloud plant disease diagnosis, unified in one mobile app.
+on-device + cloud tomato leaf disease diagnosis, unified in one
+Flutter mobile app backed by an optional serverless AWS pipeline.
 
 [![Firmware compile check](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/firmware-compile.yml/badge.svg)](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/firmware-compile.yml)
 [![Flutter CI](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/flutter-ci.yml/badge.svg)](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/flutter-ci.yml)
+[![License: MIT](https://img.shields.io/github/license/FURYBALA/smart-agriculture-system)](LICENSE)
 
 Built for **21ECC301P — Microprocessor, Microcontroller and Interfacing
-Techniques**, SRM Institute of Science and Technology. See
-[`docs/team.md`](docs/team.md) for the team and guide.
+Techniques**, SRM Institute of Science and Technology. Team and guide
+in [`docs/team.md`](docs/team.md).
 
 > This repo rebuilds the team's original project report into working,
 > version-controlled code. Not every piece could be reproduced exactly
@@ -17,91 +19,218 @@ Techniques**, SRM Institute of Science and Technology. See
 > [`docs/differences-from-report.md`](docs/differences-from-report.md).
 > Nothing here claims results it didn't actually produce.
 
+## Highlights
+
+- **Two independent ESP32 nodes** — a plain ESP32 running closed-loop
+  soil-moisture irrigation, and an ESP32-CAM running on-device leaf
+  disease classification — each with its own REST API.
+- **Custom 8-class CNN**, trained from scratch and INT8-quantized to
+  69.9 KB for on-device TFLite Micro inference.
+- **Flutter app** (6 screens) unifying both nodes plus cloud AI:
+  live sensor dashboard, manual/auto irrigation control, photo
+  diagnosis via Gemini Vision, local history, a plant-care chatbot,
+  and device connectivity tests.
+- **Deployable-but-undeployed AWS backend** (API Gateway → S3 → SQS →
+  Lambda → DynamoDB) as a self-hosted alternative inference path,
+  written as real infrastructure-as-code, not a mockup.
+- **CI on every push**: both firmware sketches compile-checked against
+  real ESP32 board definitions; the Flutter app is analyzed and
+  tested automatically.
+
 ## Architecture
 
-```
-┌─────────────────────┐        ┌──────────────────────┐
-│  Irrigation Node     │        │   Vision Node         │
-│  ESP32                │        │   ESP32-CAM            │
-│                       │        │                        │
-│  DHT11 + soil sensor  │        │  On-device TFLite      │
-│  → relay → pump       │        │  8-class disease model │
-│  REST API             │        │  REST API (/latest)    │
-└──────────┬────────────┘        └───────────┬────────────┘
-           │  same Wi-Fi                      │  same Wi-Fi
-           └───────────────┬──────────────────┘
-                            │
-                  ┌─────────▼─────────┐
-                  │   Flutter App       │
-                  │                     │
-                  │  Sensor Dashboard   │
-                  │  Irrigation Control │
-                  │  Disease Diagnosis ─┼──→ Gemini Vision API
-                  │  History            │
-                  │  Chatbot ───────────┼──→ Gemini (text)
-                  │  Device Tests       │
-                  └─────────┬───────────┘
-                            │  optional
-                  ┌─────────▼───────────┐
-                  │  Cloud Backend        │
-                  │  (not deployed)       │
-                  │  API GW → S3 → SQS →  │
-                  │  Lambda → DynamoDB    │
-                  └───────────────────────┘
+```mermaid
+flowchart TD
+    IRR["Irrigation Node — ESP32<br/>DHT11 + soil sensor<br/>relay → pump<br/>REST API"]
+    VIS["Vision Node — ESP32-CAM<br/>On-device TFLite, 8-class model<br/>REST API (/latest)"]
+    APP["Flutter App<br/>Sensor Dashboard · Irrigation Control<br/>Disease Diagnosis · History<br/>Chatbot · Device Tests"]
+    GEMV(("Gemini Vision API"))
+    GEMT(("Gemini API — text"))
+    BACK["Cloud Backend — not deployed<br/>API Gateway → S3 → SQS → Lambda → DynamoDB"]
+
+    IRR -- same Wi-Fi --> APP
+    VIS -- same Wi-Fi --> APP
+    APP -- photo diagnosis --> GEMV
+    APP -- chatbot --> GEMT
+    APP -. optional .-> BACK
 ```
 
-## Repository layout
+The two ESP32 nodes talk to the phone directly over the local Wi-Fi
+network — irrigation control keeps working even if the internet is
+down. The cloud backend is a separate, optional path: the app's
+primary diagnosis flow calls Gemini Vision directly from the phone and
+needs no backend at all.
+
+## Repository structure
 
 ```
 firmware/
-  irrigation_node/   — ESP32: sensing + pump control + REST API
-  vision_node/        — ESP32-CAM: on-device disease classification
+  irrigation_node/   ESP32: sensing + pump control + REST API
+  vision_node/        ESP32-CAM: on-device disease classification (TFLite Micro)
 ml/
-  scripts/             — download, train, quantize the vision model
-  models/              — trained model + metrics (generated)
-mobile_app/            — Flutter app, all 6 modules
-backend/                — AWS SAM cloud backend (not deployed)
-docs/                   — team, architecture, wiring, dataset, bring-up
+  scripts/             download_dataset.py -> train.py -> convert_tflite.py
+  models/              trained model + metrics (generated by the scripts above)
+mobile_app/            Flutter app, all 6 modules
+backend/                AWS SAM cloud backend (not deployed)
+docs/                   team, architecture, wiring, dataset investigation, bring-up
 ```
+
+## Technology stack
+
+| Layer | Technologies |
+|---|---|
+| Embedded / Firmware | C++ (Arduino framework), ESP32 / ESP32-CAM, TensorFlow Lite for Microcontrollers, ArduinoJson |
+| Mobile | Flutter, Dart, Provider, sqflite, `google_generative_ai` (Gemini) |
+| ML | Python, TensorFlow/Keras, TFLite INT8 quantization, PlantVillage dataset |
+| Backend | AWS Lambda (Python 3.12), API Gateway, S3, SQS, DynamoDB, AWS SAM |
+| CI/CD | GitHub Actions, `arduino-cli`, `flutter analyze` / `flutter test` |
+| Testing | Flutter unit + widget tests, Python `py_compile` checks |
+
+## Key engineering work
+
+Real problems found and fixed, not just features written:
+
+- **PSRAM tensor-arena allocation.** A 250 KB TFLite Micro arena as a
+  static array overflowed the ESP32's ~320 KB of internal DRAM by
+  ~186 KB once WiFi/WebServer buffers were counted — caught by CI, not
+  guesswork. Fixed by allocating it in PSRAM via `heap_caps_malloc`.
+- **RGB565 byte-order bug.** The ESP32 camera driver emits RGB565
+  pixels big-endian; reading them through a native `uint16_t*` cast
+  silently byte-swapped every pixel. Fixed by combining the two bytes
+  explicitly in `preprocessFrame()`.
+- **A biased evaluation sample, not quantization, was hiding a real
+  model weakness.** Quantized accuracy looked far worse than float
+  (~18-point drop). Root-caused by comparing float vs. quantized
+  predictions image-by-image (99.2% agreement, ruling out
+  quantization) — the actual bug was an alphabetically-last-N
+  evaluation slice, not a random sample. Fixing the sampling surfaced
+  the real issue (two classes stuck near chance level) and doubling
+  their training data measurably improved both. Full writeup with the
+  rejected follow-up experiments: [`docs/dataset.md`](docs/dataset.md#results).
+- **DynamoDB `Decimal` requirement.** `boto3`'s `TypeSerializer`
+  rejects native Python `float` outright — a pre-existing bug that
+  silently failed every successful inference write. Fixed with an
+  explicit `Decimal(str(value))` conversion.
+- **Shared Lambda Layer.** The `json_response` helper was duplicated
+  across all four Lambda functions; consolidated into one
+  `common_layer` referenced via SAM's `Layers:` rather than copy-pasted.
+- **Origin-tracked pump safety timer.** Gating the auto-shutoff timer
+  on "current mode == AUTO" has a hole: switching to manual mid-cycle
+  would silently disable the cutoff and leave the pump running
+  indefinitely. Fixed by tracking *who* started the pump
+  (`pumpStartedByAuto`), not the current mode.
+
+## ML model
+
+- **Task**: 8-class tomato leaf disease classification from a single
+  96×96 RGB frame.
+- **Classes**: Bacterial Spot, Early Blight, Healthy, Late Blight,
+  Septoria Leaf Spot, Spider Mite, TYLCV, Target Spot.
+- **Data**: 3,200 images (400/class) from PlantVillage — see
+  [`docs/dataset.md`](docs/dataset.md) for the exact source-class
+  mapping and one documented substitution (Bacterial Speck →
+  Bacterial Spot, the closest available proxy).
+- **Model**: custom CNN (4 conv blocks, global average pooling, ~61K
+  params), trained from scratch with Keras.
+- **Quantization**: post-training INT8, converted to a 69.9 KB TFLite
+  file for TFLite Micro on the ESP32-CAM; the same `.tflite` file is
+  reused by the optional cloud inference Lambda.
+- **Results**: 81.9% float validation accuracy, 65.8% quantized
+  spot-check accuracy (240 held-out images). These are dataset
+  evaluation figures from held-out PlantVillage images, **not a
+  measurement of real-world field accuracy** — real garden photos have
+  cluttered backgrounds and lighting PlantVillage's cropped,
+  plain-background images don't.
+
+## Known limitations
+
+- **Spider Mite (40.0%) and Target Spot (43.3%) remain weak classes**
+  — well below the other six (63–90%). Root-caused via confusion
+  matrix: both diseases' visual features overlap heavily with
+  Septoria Leaf Spot specifically (not with each other), which looks
+  like an architectural/feature-resolution limit rather than a
+  fixable data or training bug. Two follow-up experiments (an
+  imbalanced 1,000-image oversample, and class-weighted loss) were
+  tried and both made results *worse* — documented rather than
+  discarded, in [`docs/dataset.md`](docs/dataset.md#results).
+- **PlantVillage vs. real-world images.** The model has not been
+  evaluated on photos taken in an actual garden; expect a real
+  accuracy drop until fine-tuned on real deployment images (noted in
+  [`docs/bring-up-checklist.md`](docs/bring-up-checklist.md)).
+- **No live MJPEG stream from the vision node.** The original report's
+  plan (streaming video to the app) was unreliable on this hardware;
+  the app instead polls the node's latest single classification
+  result over REST. See
+  [`docs/differences-from-report.md`](docs/differences-from-report.md).
+
+## Verification status
+
+| Component | Verification | Status |
+|---|---|---|
+| Firmware (both nodes) | Compiled in CI (`arduino-cli`) against real ESP32 board definitions on every push | ✅ Build-verified |
+| Flutter app | `flutter analyze` (clean) + `flutter test` (8 tests) in CI on every push | ✅ Passing |
+| Backend (Lambda / SAM) | Full manual code review, all Python files syntax-checked (`py_compile`) | ✅ Reviewed — not deployed |
+| ML pipeline | Class-label order, INT8 quantization params, and model size cross-checked across firmware headers, backend, and training metadata | ✅ Consistent |
+| Physical ESP32/ESP32-CAM hardware | Flashing and hardware bring-up | ⏳ Pending — no hardware available in the development environment |
+| Mobile runtime | Running on a physical device/emulator | ⏳ Pending — no device/emulator available in the development environment |
+| AWS deployment | `sam deploy` | ⏳ Pending — no AWS credentials/account available |
+
+"Build-verified" and "reviewed" are deliberately not written as
+"tested on hardware" — see **External validation** below.
 
 ## Getting started
 
-Each component has its own setup:
+Each component has its own setup; see the linked doc for full detail.
 
-- **Firmware**: [`docs/wiring.md`](docs/wiring.md) then
-  [`docs/bring-up-checklist.md`](docs/bring-up-checklist.md)
-- **ML pipeline**: [`docs/dataset.md`](docs/dataset.md) — `pip install
-  -r ml/requirements.txt`, then `download_dataset.py` → `train.py` →
-  `convert_tflite.py`
-- **Mobile app**: `cd mobile_app && flutter pub get`, copy `.env.example`
-  to `.env` and fill in your Gemini API key and node IPs, then
-  `flutter run`
-- **Backend** (optional): [`backend/README.md`](backend/README.md)
+- **Firmware**: [`docs/wiring.md`](docs/wiring.md) (pinout, power)
+  then [`docs/bring-up-checklist.md`](docs/bring-up-checklist.md)
+  (library install, flashing, first-boot checks)
+- **ML pipeline**: [`docs/dataset.md`](docs/dataset.md) —
+  `pip install -r ml/requirements.txt`, then `download_dataset.py` →
+  `train.py` → `convert_tflite.py`
+- **Mobile app**:
+  ```bash
+  cd mobile_app
+  flutter pub get
+  cp .env.example .env   # fill in your own Gemini API key + node IPs
+  flutter analyze && flutter test
+  flutter run
+  ```
+- **Backend** (optional, not deployed): [`backend/README.md`](backend/README.md)
+  — `sam build --use-container && sam deploy --guided`, requires your
+  own AWS account and credentials.
 
-## Results
+## External validation
 
-| | |
-|---|---|
-| Disease classes | 8 tomato leaf conditions (see [`docs/dataset.md`](docs/dataset.md)) |
-| Training data | 3,200 images, PlantVillage subset (400/class) |
-| Model | Custom CNN, 96×96×3 input, 61K params |
-| Validation accuracy (float) | **81.9%** |
-| Quantized (INT8) model | 69.9 KB, **65.8% spot-check accuracy** — quantization itself is ~lossless (99.2% prediction agreement with float); 2 of 8 classes (Spider Mite, Target Spot) are still the model's weak point at 40-43%, up from ~13% before doubling the dataset. Per-class breakdown in [`docs/dataset.md`](docs/dataset.md) |
-| Mobile app | 6 modules, verified via `flutter analyze` + `flutter test` (passing) |
-| CI | Both firmware sketches compile-checked on every push against real ESP32 board definitions; caught and fixed 2 real bugs |
+Everything above was verified through compilation, static analysis,
+and automated tests in the development environment. Three things were
+not, because the required resources weren't available there:
 
-The accuracy investigation is a good example of the standard this repo
-holds itself to: the first hypothesis (thin INT8 calibration data) was
-tested and ruled out, the real cause (a biased evaluation sample, not
-quantization) was found by actually comparing predictions image-by-
-image, and once that bug was fixed, the underlying model weakness it
-had been hiding (two classes near chance level) got a real fix
-attempt — doubling the dataset — that measurably helped (both classes
-roughly tripled) without fully closing the gap. Reported at every
-step, including where it's still short. Full writeup:
-[`docs/dataset.md`](docs/dataset.md#results).
+- **ESP32 / ESP32-CAM hardware.** No physical board was available, so
+  neither node has been flashed or bring-up tested. Firmware
+  compiling cleanly in CI is verified; behaving correctly on real
+  hardware is not — go through
+  [`docs/bring-up-checklist.md`](docs/bring-up-checklist.md) before a
+  first flash rather than assuming it.
+- **Flutter on a real device or emulator.** No Android/iOS emulator,
+  Chrome, or Visual Studio C++ toolchain was available. `flutter
+  analyze` and `flutter test` pass; the app has not been run.
+- **AWS deployment.** No AWS account/credentials were available.
+  `backend/` is real, deployable SAM infrastructure, but `sam deploy`
+  has never been run against it — see
+  [`backend/README.md`](backend/README.md) for what another engineer
+  with credentials would need to deploy it.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Training dataset separately attributed,
-see [`docs/dataset.md`](docs/dataset.md).
+MIT — see [LICENSE](LICENSE). The tomato disease training dataset is a
+separately-licensed subset of PlantVillage (Hughes & Salathe, 2015);
+see [`docs/dataset.md`](docs/dataset.md) for attribution and citation.
+The MIT license covers the original code in this repository only.
+
+## Team
+
+Built by a team of three for 21ECC301P at SRM Institute of Science and
+Technology, under guide Dr. Rajalakshmi T. Full names, registration
+numbers, and a note on what was rebuilt vs. carried over from the
+original report: [`docs/team.md`](docs/team.md).
