@@ -78,6 +78,11 @@ class _DiagnosisScreenState extends State<DiagnosisScreen> {
     });
     try {
       final latest = await esp32.fetchLatestVisionResult();
+      if (!latest.hasResult) {
+        setState(() => _error =
+            'The vision node has no result yet -- point the ESP32-CAM at a leaf and wait a few seconds.');
+        return;
+      }
       if (latest.ageMs > 60000) {
         setState(() => _error =
             'Vision node result is ${(latest.ageMs / 1000).round()}s old -- point the ESP32-CAM at a leaf and try again.');

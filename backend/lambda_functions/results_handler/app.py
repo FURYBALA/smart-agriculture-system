@@ -2,12 +2,14 @@
 GET /diagnose/{diagnosisId}
 Polled by the client after POST /diagnose (upload_handler) returns a
 diagnosisId. Returns 202 + {"status": "pending"} while inference_handler
-hasn't finished yet, or 200 with the full result once it has.
+hasn't finished yet, or 200 with the full result once it has (including
+{"status": "failed", "error": "..."} if inference_handler couldn't
+process the image).
 """
-import json
 import os
 
 import boto3
+from common import json_response
 
 dynamodb = boto3.resource("dynamodb")
 RESULTS_TABLE = os.environ["RESULTS_TABLE"]
@@ -19,14 +21,6 @@ def handler(event, context):
 
     item = table.get_item(Key={"diagnosisId": diagnosis_id}).get("Item")
     if item is None:
-        return _response(202, {"status": "pending"})
+        return json_response(202, {"status": "pending"})
 
-    return _response(200, item)
-
-
-def _response(status_code, body):
-    return {
-        "statusCode": status_code,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(body),
-    }
+    return json_response(200, item)

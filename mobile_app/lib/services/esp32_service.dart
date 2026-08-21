@@ -57,7 +57,13 @@ class Esp32Service {
 
   /// Latest on-device disease classification from the vision node --
   /// a free, offline-capable alternative to cloud (Gemini) diagnosis.
-  Future<({String diseaseClass, double confidence, int ageMs})> fetchLatestVisionResult() async {
+  ///
+  /// [hasResult] is explicit rather than inferred from [ageMs]: right
+  /// after boot (or if every inference attempt has failed so far) the
+  /// node has no result yet, which is reported as age 0 -- the
+  /// opposite of what "age" should mean if a caller assumed age 0 ==
+  /// freshest. Always check hasResult first.
+  Future<({String diseaseClass, double confidence, int ageMs, bool hasResult})> fetchLatestVisionResult() async {
     final res = await http.get(_visionUri('/latest')).timeout(_timeout);
     if (res.statusCode != 200) {
       throw Esp32Exception('Vision node read failed (${res.statusCode})');
@@ -67,6 +73,7 @@ class Esp32Service {
       diseaseClass: json['class'] as String,
       confidence: (json['confidence'] as num).toDouble(),
       ageMs: (json['ageMs'] as num).toInt(),
+      hasResult: json['hasResult'] as bool? ?? false,
     );
   }
 

@@ -57,8 +57,13 @@ void startPump() {
   pumpStartedAt = millis();
 }
 
+// Auto-cutoff safety timer -- only applies to pumps started by the
+// AUTO-mode watering cycle (startPump()). Manual mode gives the user
+// direct on/off control via the REST API with no hidden timer; a
+// pump started manually is stopped only by an explicit /pump/off
+// call, not by this timer.
 void servicePumpTimer() {
-  if (!pumpOn) return;
+  if (!pumpOn || currentMode != MODE_AUTO) return;
   if (millis() - pumpStartedAt >= PUMP_RUN_MS) {
     setPumpOutput(false);
     pumpLastFinishedAt = millis();

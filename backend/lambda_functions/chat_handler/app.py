@@ -14,6 +14,7 @@ import time
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from common import json_response
 
 dynamodb = boto3.resource("dynamodb")
 CHAT_TABLE = os.environ["CHAT_TABLE"]
@@ -27,7 +28,7 @@ def handler(event, context):
 
     if method == "GET":
         rows = table.query(KeyConditionExpression=Key("sessionId").eq(session_id))
-        return _response(200, {"messages": rows.get("Items", [])})
+        return json_response(200, {"messages": rows.get("Items", [])})
 
     if method == "POST":
         try:
@@ -35,7 +36,7 @@ def handler(event, context):
             role = body["role"]
             text = body["text"]
         except (KeyError, json.JSONDecodeError):
-            return _response(400, {"error": "expected JSON body with role and text"})
+            return json_response(400, {"error": "expected JSON body with role and text"})
 
         table.put_item(Item={
             "sessionId": session_id,
@@ -43,14 +44,6 @@ def handler(event, context):
             "role": role,
             "text": text,
         })
-        return _response(201, {"status": "saved"})
+        return json_response(201, {"status": "saved"})
 
-    return _response(405, {"error": "method not allowed"})
-
-
-def _response(status_code, body):
-    return {
-        "statusCode": status_code,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(body),
-    }
+    return json_response(405, {"error": "method not allowed"})

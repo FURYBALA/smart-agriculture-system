@@ -16,12 +16,16 @@ diagram.
 """
 import io
 import json
+import logging
 import os
 
 import boto3
 import numpy as np
 from PIL import Image
 import tflite_runtime.interpreter as tflite
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 s3 = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb")
@@ -61,35 +65,54 @@ def _preprocess(image_bytes, input_details):
     return np.expand_dims(arr, axis=0)
 
 
+def _run_one(table, diagnosis_id, bucket, key):
+    obj = s3.get_object(Bucket=bucket, Key=key)
+    image_bytes = obj["Body"].read()
+
+    interpreter = _get_interpreter()
+    input_details = interpreter.get_input_details()[0]
+    output_details = interpreter.get_output_details()[0]
+
+    interpreter.set_tensor(input_details["index"], _preprocess(image_bytes, input_details))
+    interpreter.invoke()
+    output = interpreter.get_tensor(output_details["index"])[0]
+
+    out_scale, out_zero_point = output_details["quantization"]
+    probs = (output.astype(np.float32) - out_zero_point) * out_scale
+    best_idx = int(np.argmax(probs))
+
+    table.put_item(Item={
+        "diagnosisId": diagnosis_id,
+        "status": "complete",
+        "diseaseName": CLASS_LABELS[best_idx],
+        "confidence": float(probs[best_idx]),
+    })
+
+
 def handler(event, context):
     table = dynamodb.Table(RESULTS_TABLE)
 
     for record in event["Records"]:
         message = json.loads(record["body"])
         diagnosis_id = message["diagnosisId"]
-        bucket = message["bucket"]
-        key = message["key"]
 
-        obj = s3.get_object(Bucket=bucket, Key=key)
-        image_bytes = obj["Body"].read()
-
-        interpreter = _get_interpreter()
-        input_details = interpreter.get_input_details()[0]
-        output_details = interpreter.get_output_details()[0]
-
-        interpreter.set_tensor(input_details["index"], _preprocess(image_bytes, input_details))
-        interpreter.invoke()
-        output = interpreter.get_tensor(output_details["index"])[0]
-
-        out_scale, out_zero_point = output_details["quantization"]
-        probs = (output.astype(np.float32) - out_zero_point) * out_scale
-        best_idx = int(np.argmax(probs))
-
-        table.put_item(Item={
-            "diagnosisId": diagnosis_id,
-            "status": "complete",
-            "diseaseName": CLASS_LABELS[best_idx],
-            "confidence": float(probs[best_idx]),
-        })
+        # A bad image or a model error must not leave the client
+        # polling GET /diagnose/{id} forever with no way to know
+        # something went wrong -- write an explicit failed status
+        # instead of letting the exception propagate and skip the
+        # DynamoDB write entirely (which was the original bug: one
+        # corrupt image meant no record was ever written, "pending"
+        # forever, and -- with a larger BatchSize than the 1 used
+        # here -- would also have failed already-succeeded records in
+        # the same batch).
+        try:
+            _run_one(table, diagnosis_id, message["bucket"], message["key"])
+        except Exception:
+            logger.exception("Inference failed for diagnosisId=%s", diagnosis_id)
+            table.put_item(Item={
+                "diagnosisId": diagnosis_id,
+                "status": "failed",
+                "error": "Inference failed -- the image may be corrupt or an unsupported format.",
+            })
 
     return {"statusCode": 200}

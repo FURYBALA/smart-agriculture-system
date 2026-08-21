@@ -13,8 +13,22 @@ Globals:
     Timeout: 30
     MemorySize: 512
     Runtime: python3.12
+    Layers:
+      - !Ref CommonLayer
 
 Resources:
+
+  # ---- Shared code (json_response helper -- one copy, not
+  #      duplicated across all four function directories) ----
+
+  CommonLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: smart-agriculture-common
+      ContentUri: ../lambda_functions/common_layer/
+      CompatibleRuntimes:
+        - python3.12
+      RetentionPolicy: Delete
 
   # ---- Storage ----
 

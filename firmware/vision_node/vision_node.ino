@@ -141,11 +141,15 @@ bool setupCamera() {
 }
 
 void preprocessFrame(camera_fb_t* fb) {
-  const uint16_t* pixels = reinterpret_cast<const uint16_t*>(fb->buf);
+  // esp32-camera's RGB565 output is big-endian per pixel (high byte
+  // first), not the Xtensa core's native little-endian -- reading it
+  // through a uint16_t* cast byte-swaps every pixel. Combine the two
+  // bytes explicitly instead.
+  const uint8_t* bytes = fb->buf;
   const int pixelCount = kInputWidth * kInputHeight;
 
   for (int i = 0; i < pixelCount; i++) {
-    uint16_t p = pixels[i];
+    uint16_t p = (static_cast<uint16_t>(bytes[i * 2]) << 8) | bytes[i * 2 + 1];
     uint8_t r5 = (p >> 11) & 0x1F;
     uint8_t g6 = (p >> 5) & 0x3F;
     uint8_t b5 = p & 0x1F;
@@ -196,12 +200,20 @@ void runInference() {
   Serial.printf("Prediction: %s  (%.1f%% confidence)\n", latestClass.c_str(), latestConfidence * 100.0f);
 }
 
-// ---- REST: GET /latest -> { class, confidence, ageMs } ----
+// ---- REST: GET /latest -> { class, confidence, ageMs, hasResult } ----
 void handleLatest() {
-  unsigned long age = latestAtMillis == 0 ? 0 : (millis() - latestAtMillis);
+  // latestAtMillis == 0 means no inference has ever succeeded yet
+  // (right after boot, or every attempt so far has failed). That's
+  // not "age 0" (freshest possible) -- it's "no result exists" --
+  // hasResult makes that explicit instead of relying on callers to
+  // infer it from age, which a caller checking only "is age > 60s"
+  // would get backwards (0 looks freshest, not oldest).
+  bool hasResult = latestAtMillis != 0;
+  unsigned long age = hasResult ? (millis() - latestAtMillis) : 0;
   String json = "{";
   json += "\"class\":\"" + latestClass + "\",";
   json += "\"confidence\":" + String(latestConfidence, 3) + ",";
+  json += "\"hasResult\":" + String(hasResult ? "true" : "false") + ",";
   json += "\"ageMs\":" + String(age);
   json += "}";
   server.send(200, "application/json", json);

@@ -13,11 +13,13 @@ Response (202):
   { "diagnosisId": "..." }
 """
 import base64
+import binascii
 import json
 import os
 import uuid
 
 import boto3
+from common import json_response
 
 s3 = boto3.client("s3")
 sqs = boto3.client("sqs")
@@ -37,13 +39,17 @@ def handler(event, context):
         image_b64 = body["imageBase64"]
         mime_type = body.get("mimeType", "image/jpeg")
     except (KeyError, json.JSONDecodeError):
-        return _response(400, {"error": "expected JSON body with imageBase64"})
+        return json_response(400, {"error": "expected JSON body with imageBase64"})
+
+    try:
+        image_bytes = base64.b64decode(image_b64, validate=True)
+    except (binascii.Error, ValueError):
+        return json_response(400, {"error": "imageBase64 is not valid base64"})
 
     extension = EXTENSION_BY_MIME.get(mime_type, "jpg")
     diagnosis_id = str(uuid.uuid4())
     s3_key = f"uploads/{diagnosis_id}.{extension}"
 
-    image_bytes = base64.b64decode(image_b64)
     s3.put_object(Bucket=BUCKET_NAME, Key=s3_key, Body=image_bytes, ContentType=mime_type)
 
     sqs.send_message(
@@ -55,12 +61,4 @@ def handler(event, context):
         }),
     )
 
-    return _response(202, {"diagnosisId": diagnosis_id})
-
-
-def _response(status_code, body):
-    return {
-        "statusCode": status_code,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(body),
-    }
+    return json_response(202, {"diagnosisId": diagnosis_id})
