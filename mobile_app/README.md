@@ -26,6 +26,24 @@ See [`../docs/bring-up-checklist.md`](../docs/bring-up-checklist.md)
 for full setup details, and [`../docs/wiring.md`](../docs/wiring.md)
 for the ESP32 hardware this app talks to.
 
+## Building a release APK
+
+```bash
+flutter build apk --release
+```
+Output: `build/app/outputs/flutter-apk/app-release.apk`. Requires a
+complete Android SDK (`flutter doctor` should show no `[X]` under the
+Android toolchain) -- not verified in this project's dev environment,
+where the Android SDK's `cmdline-tools` component and licenses were
+incomplete (see [`../docs/flutter-runtime.md`](../docs/flutter-runtime.md)).
+Install the resulting APK on a device or emulator with
+`adb install app-release.apk`, or `flutter install` with a device
+connected.
+
+For iOS, this project has no Apple Developer account or macOS build
+environment behind it -- `flutter build ios` and code signing are
+standard Flutter steps, but genuinely untested here.
+
 ## Verified, not just written
 
 ```bash

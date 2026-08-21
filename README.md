@@ -261,7 +261,15 @@ measures.
 
 ## Getting started
 
-Each component has its own setup; see the linked doc for full detail.
+For the complete start-from-zero setup across every component in one
+place — including AWS deployment steps and a troubleshooting table —
+see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md). The full test matrix
+(what's verified vs. still blocked, per test case) is
+[`docs/end-to-end-test-plan.md`](docs/end-to-end-test-plan.md), and the
+checklist to work through once physical hardware is available is
+[`docs/hardware-validation-checklist.md`](docs/hardware-validation-checklist.md).
+
+Each component also has its own focused setup doc:
 
 - **Firmware**: [`docs/wiring.md`](docs/wiring.md) (pinout, power)
   then [`docs/bring-up-checklist.md`](docs/bring-up-checklist.md)

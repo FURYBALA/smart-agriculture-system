@@ -61,15 +61,52 @@ Flutter app --GET/POST /chat/{sessionId}--> API Gateway --> chat_handler --> Dyn
 ## Deploying
 
 ```bash
+# 1. Configure AWS credentials (once)
+aws configure   # or: export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... AWS_DEFAULT_REGION=...
+
+# 2. Build (see "Before deploying" above for the two manual steps first)
 pip install aws-sam-cli   # if you don't have it
 cd infrastructure
 sam build --use-container
+
+# 3. Deploy
 sam deploy --guided
 ```
 
 You'll need an AWS account and configured credentials. `sam deploy --guided`
 walks through stack name, region, and confirms the resources before
-creating anything.
+creating anything -- nothing is created until you approve that prompt.
+
+```bash
+# 4. Retrieve the deployed API URL
+aws cloudformation describe-stacks --stack-name <the-stack-name-you-chose> \
+  --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text
+```
+
+Put that URL into `mobile_app/.env` as `BACKEND_API_URL` if you're using
+this backend path instead of (or alongside) Gemini-direct.
+
+```bash
+# 5. Smoke-test the deployed API
+curl -X POST "<ApiUrl>diagnose" \
+  -H "Content-Type: application/json" \
+  -d '{"imageBase64":"<base64-encoded-jpeg>","mimeType":"image/jpeg"}'
+# -> {"diagnosisId": "..."}, then:
+curl "<ApiUrl>diagnose/<diagnosisId>"
+# -> {"status": "pending"} at first, then {"status": "complete", "diseaseName": "...", "confidence": ...}
+```
+
+## Tearing down
+
+```bash
+sam delete --stack-name <the-stack-name-you-chose>
+```
+Removes every resource the stack created (Lambda functions, API Gateway,
+S3 bucket, SQS queue, DynamoDB tables). The S3 bucket has a 90-day
+image-expiry lifecycle rule but isn't emptied automatically by
+`sam delete` if it still has objects in it -- empty it first
+(`aws s3 rm s3://<bucket-name> --recursive`) if deletion fails on that
+account.
 
 ## Local testing without AWS
 
