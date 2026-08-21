@@ -33,3 +33,14 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+
+      # No physical Android/iOS device or emulator is available in this
+      # project's dev environment (see docs/flutter-runtime.md), and this
+      # app is architected mobile-first (dart:io File for local image
+      # storage, sqflite for history) so web isn't a stand-in for that --
+      # but a clean web build is still real, useful evidence the app's
+      # non-platform-specific code has no compile-time issues.
+      - name: flutter build web (compile-only smoke test)
+        run: |
+          flutter config --enable-web
+          flutter build web
