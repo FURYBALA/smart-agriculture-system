@@ -1,0 +1,61 @@
+name: Backend CI
+
+# Runs what the local dev environment this repo was built in couldn't:
+# GitHub's ubuntu-latest runners ship Docker, which `sam build
+# --use-container` and `sam local` need and this project's Windows dev
+# machine didn't have -- see docs/backend-local-testing.md for exactly
+# what was and wasn't verified locally as a result.
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - "ml/models/training_metadata.json"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+  workflow_dispatch:
+
+jobs:
+  handler-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: pip install -r backend/requirements-dev.txt
+
+      - name: Byte-compile every tracked backend .py file
+        run: |
+          find backend -name "*.py" -print0 | xargs -0 -n1 python -m py_compile
+
+      - name: Run Lambda handler tests (moto-mocked AWS, no Docker/account needed)
+        working-directory: backend
+        run: python -m pytest tests/ -v
+
+  sam-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install AWS SAM CLI
+        run: pip install aws-sam-cli
+
+      - name: sam validate
+        working-directory: backend/infrastructure
+        run: sam validate --lint
+
+      - name: sam build (container -- this runner has Docker, unlike local dev)
+        working-directory: backend/infrastructure
+        run: sam build --use-container
+        env:
+          SAM_CLI_TELEMETRY: "0"
