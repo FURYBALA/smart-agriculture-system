@@ -40,9 +40,12 @@ is now a permanent CI check (`flutter-ci.yml`'s `flutter build web`
 step) precisely because it wasn't obvious in advance whether it would
 work.
 
-**What was not verified:** actually running the built output in a
-browser and observing it. Two real attempts, both with concrete,
-specific outcomes -- not left untried:
+**Update -- now actually observed.** The two attempts below (both from
+an earlier pass) still stand as real, documented dead ends for the
+tools they used, but they are no longer the last word: a working
+isolated headless browser was found afterward (see "Real browser
+observation" below), and it answered every question this section used
+to leave open.
 
 1. `flutter run -d edge` -- the dart2js compile step alone took ~45+
    seconds before this environment's tooling limits made it impractical
@@ -61,29 +64,107 @@ specific outcomes -- not left untried:
    specific Edge installation's headless mode in this environment, not
    an assumption that browser observation is impossible in general.
 
-So:
+## Real browser observation (Playwright + Chromium)
 
-- Whether `HistoryScreen` (which opens a `sqflite` database via
-  `HistoryDatabase`, and is kept mounted at all times by `HomeShell`'s
-  `IndexedStack`) fails gracefully or crashes on web is **not
-  confirmed either way**. `sqflite` has no web implementation without
-  the separate `sqflite_common_ffi_web` package, which this project
-  doesn't depend on. Reasoned prediction based on reading the code
-  (not an observed result): the `FutureBuilder`/`_ErrorList` pattern
-  already in `history_screen.dart` would likely turn that into a
-  caught, displayed error rather than an app-wide crash -- but that's
-  a prediction, not something that's been watched happen.
-  - Fix scope note, deliberately not done: making History (and image
-    storage) actually work correctly on web would mean swapping
-    `sqflite` for `sqflite_common_ffi_web` and replacing `dart:io File`
-    with an abstraction that works on both platforms -- a real,
-    multi-file architecture change, not a quick patch. Out of scope for
-    this pass (see the "don't rebuild working code" constraint this
-    audit itself was given); noted here rather than silently worked
-    around.
-- Whether the other five screens (Sensor Dashboard, Irrigation Control,
-  Disease Diagnosis, Chatbot, Device Tests) render and behave correctly
-  in a browser is also unconfirmed for the same reason.
+What actually unblocked this: `npx playwright install chromium`
+downloads its own isolated Chromium build (not the environment's Edge
+profile), so it doesn't hit attempt #2's problem. Set up a small
+scratch Node project, `npm install playwright`, served `build/web` with
+`python -m http.server`, and drove real headless Chromium against it --
+navigating by clicking the actual `NavigationBar` destinations at their
+real screen coordinates (not simulated events), capturing a full-page
+screenshot after each, plus every `console` and `pageerror` event the
+page produced.
+
+**All six screens render correctly**, confirmed by screenshot, not
+assumption:
+
+- **Sensors** (Sensor Dashboard): renders, shows a loading spinner
+  waiting on an unreachable ESP32 -- correct behavior with no device
+  present.
+- **Irrigation**: renders "Could not reach the irrigation node." --
+  the same readable-error path M6 already unit-tested, now observed
+  in an actual rendered frame.
+- **Diagnose**: renders the image picker UI ("No image selected",
+  Camera/Gallery buttons, both diagnosis-path buttons) cleanly.
+- **History**: see below -- this is the one screen that needed a real
+  fix, not just observation.
+- **Chat**: renders the initial assistant greeting and input bar
+  correctly.
+- **Device**: renders both device rows and the "Test All" button
+  correctly.
+
+No uncaught JS exceptions (`pageerror`) were produced by navigating
+the app through all six screens both before and after the History fix
+below; the only console output throughout was routine (service worker
+install, a WebGL performance advisory from software rendering in a
+headless/no-GPU environment -- not an app bug).
+
+### HistoryScreen: real bug, real fix, real re-verification
+
+Before any fix, History rendered a real, unhandled-looking error (not
+a crash, but not usable either):
+```
+Could not load history: Bad state: databaseFactory not initialized
+databaseFactory is only initialized when using sqflite_common_ffi.
+...
+```
+This confirms the *fact* of the earlier prediction (fails gracefully
+via the existing `FutureBuilder`/`_ErrorList` pattern, not an app-wide
+crash) while showing the prediction undersold it: History was
+completely unusable on web, not just imperfect.
+
+**Fixed properly**, not worked around: added `sqflite_common_ffi_web`
+as a real dependency, and in `main.dart`, guarded by `kIsWeb`:
+```dart
+if (kIsWeb) {
+  databaseFactory = databaseFactoryFfiWeb;
+}
+```
+`HistoryDatabase` itself (`history_database.dart`) needed **zero
+changes** -- its `openDatabase()`/`getDatabasesPath()` calls are the
+plain top-level `sqflite` functions, which already delegate to
+whichever `databaseFactory` is registered. Mobile is unaffected: the
+`kIsWeb` branch never executes there, so it keeps using the default
+platform-channel factory exactly as before.
+
+This alone wasn't sufficient -- the web factory also needs a service
+worker and a `sqlite3.wasm` binary present as static assets, generated
+once via:
+```bash
+dart run sqflite_common_ffi_web:setup
+```
+which produced `mobile_app/web/sqflite_sw.js` and
+`mobile_app/web/sqlite3.wasm`. These are committed as real project
+assets (like `web/index.html`), not build output -- `flutter build web`
+copies them into `build/web/` but does not regenerate them; re-run the
+setup command above if `sqflite_common_ffi_web` is ever upgraded.
+
+**Re-verified after the fix**, same method as before (`flutter
+analyze`, `flutter test` -- both still clean, 19/19 tests passing,
+unaffected since none of this touches mobile code paths -- then
+`flutter build web`, then the same real headless-Chromium pass):
+History now renders **"No diagnoses yet."** -- a clean, successful
+empty query against a real IndexedDB/wasm-backed SQLite database in
+the browser, not an error. `Sensor Log`'s tab behaves the same way.
+
+What this proves: the on-disk history database genuinely opens,
+creates its schema, and queries successfully on web now. What it
+doesn't prove: that a diagnosis actually gets *saved* through the full
+web UI flow -- `diagnosis_screen.dart` reads the picked image via
+`dart:io File(...).readAsBytes()` before saving, and plain `dart:io`
+has no real file-reading implementation on web either (a second,
+separate `dart:io`-on-web gap, in the image path rather than the
+database path). That wasn't observed to fail -- doing so would require
+driving Playwright through a real file-picker interaction, not
+attempted here -- so it's named as a known, unaddressed limitation
+rather than either fixed or claimed working. Fixing it would mean
+switching `image_picker`'s web bytes API and `Image.memory` in place of
+`Image.file`/`dart:io File` in both `diagnosis_screen.dart` and
+`history_screen.dart`'s thumbnail rendering -- a second real
+architecture change, deliberately left out of this pass's scope (this
+one was specifically about the database layer, which is what was
+observed broken).
 
 ## Android release APK: real build fix, real success
 
@@ -116,10 +197,14 @@ build output.
 
 ## Bottom line
 
-Flutter web (`flutter build web`) and Android (`flutter build apk
---release`) are both now genuinely working **compile/build-time**
-checks -- the Android one only after a real, non-trivial toolchain fix,
-not assumed to work from `flutter doctor` looking clean. Neither is,
-or is claimed to be, a substitute for actually running this app on a
-device, emulator, or browser and watching it work -- that remains
-externally blocked, same as physical ESP32 hardware.
+Flutter web is now verified at **both** levels: `flutter build web`
+(compile-time) and a real headless-Chromium run that actually opened
+the app and clicked through all six screens (runtime) -- including a
+real bug (HistoryScreen's database on web) found and fixed along the
+way, not just observed and left broken. Android
+(`flutter build apk --release`) remains build-time only -- a real,
+verified 20.7MB APK exists, after a real non-trivial toolchain fix, but
+it has never been installed or launched on a device or emulator, so
+nothing about its actual runtime behavior is known. That -- and
+physical ESP32 hardware -- are what remain externally blocked, not
+"any Flutter runtime, unqualified."

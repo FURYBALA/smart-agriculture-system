@@ -110,3 +110,19 @@ never commit that substitution, it's simulation-only.
 If a future run gets further than "stalls after connecting," that's
 real new information worth replacing this file's conclusion with --
 not something to guess at in advance.
+
+## Re-attempted 2026-08-22: same result
+
+Re-ran this end to end again, independently, on a later date: recompiled
+`irrigation_node` fresh (`arduino-cli` still installed, same successful
+build size), re-linted `diagram.json`/`wokwi.toml` (clean, same one
+informational `unsupported-part` notice as before, no errors), then ran
+`wokwi-cli` against the real firmware with a real `WOKWI_CLI_TOKEN` --
+`--serial-log-file` captured a **0-byte file**, confirming zero serial
+output. Re-ran the same independent trivial sanity sketch
+(`Serial.begin(); Serial.println("SANITY BOOT OK");`) against a bare
+one-part diagram with no project code involved at all -- identical
+result: connects, "Starting simulation...", then times out with no
+output. Same reproducible environment/service-level limitation, not a
+regression or a newly-introduced bug; nothing here has changed since the
+first attempt.

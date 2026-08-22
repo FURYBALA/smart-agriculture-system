@@ -304,7 +304,8 @@ Each component also has its own focused setup doc:
 
 Everything above was verified through compilation, static analysis,
 and automated tests in the development environment — plus, as of this
-pass, a real AWS deployment. Two things remain genuinely external:
+pass, a real AWS deployment and a real browser runtime. What remains
+genuinely external is narrower than it used to be:
 
 - **ESP32 / ESP32-CAM hardware.** No physical board was available, so
   neither node has been flashed or bring-up tested. Firmware compiling
@@ -314,24 +315,27 @@ pass, a real AWS deployment. Two things remain genuinely external:
   [`docs/bring-up-checklist.md`](docs/bring-up-checklist.md) before a
   first flash rather than assuming it. A Wokwi simulation for the
   irrigation node was actually attempted with a real token against
-  Wokwi's real API — it found and fixed two real config bugs, then
-  connects successfully but stalls before completing, for reasons
-  confirmed unrelated to this project's firmware (a trivial sanity
-  sketch fails identically) — see
-  [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md) for the full,
-  honest diagnosis.
-- **Flutter on a real device or emulator.** No physical device or
-  emulator was available. `flutter analyze`, `flutter test` (including
-  a real ESP32-simulator integration test), `flutter build web`, and
-  `flutter build apk --release` all pass — the last one only after
-  fixing a real Gradle/Kotlin/JDK version mismatch in the Android build
-  config — but the resulting APK has never actually been installed and
-  watched run on a device or emulator, and the app has never been
-  observed rendering in a browser either. See
-  [`docs/flutter-runtime.md`](docs/flutter-runtime.md) for exactly what
-  was and wasn't checked, including an open question about whether
-  `HistoryScreen` fails gracefully or crashes on web (predicted, not
-  observed).
+  Wokwi's real API, twice on two different dates — it found and fixed
+  two real config bugs, then connects successfully but stalls before
+  completing, for reasons confirmed unrelated to this project's
+  firmware (a trivial sanity sketch fails identically, both times) —
+  see [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md) for the
+  full, honest diagnosis.
+- **Flutter on a physical device or emulator.** No physical Android/iOS
+  device or emulator was available, so the release APK
+  (`flutter build apk --release`, a real, verified 20.7MB file after
+  fixing a real Gradle/Kotlin/JDK version mismatch) has never actually
+  been installed and watched run there. The **web** runtime is no
+  longer part of this gap: a real, isolated headless Chromium (via
+  Playwright) actually loaded the built app and was driven through all
+  6 screens, screenshotting each, with zero uncaught exceptions — and
+  that process found and fixed a real bug (`HistoryScreen`'s database
+  didn't work on web at all) rather than leaving it as an open
+  question. See [`docs/flutter-runtime.md`](docs/flutter-runtime.md)
+  for the full account, screenshots' contents, and exactly what's still
+  unconfirmed (a populated diagnosis/history list was never observed,
+  since no data was saved through the real UI in this pass).
+
 **AWS deployment is no longer on this list** — the backend is deployed
 and verified for real (stack `smart-agriculture-system`, `ap-south-1`):
 see [`backend/README.md`](backend/README.md#deployed-instance) and
