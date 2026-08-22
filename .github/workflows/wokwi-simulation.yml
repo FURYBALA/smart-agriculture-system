@@ -1,0 +1,46 @@
+name: Wokwi simulation (irrigation node)
+
+# Manual-only. This needs a WOKWI_CLI_TOKEN repository secret
+# (https://wokwi.com/dashboard/ci) that does not exist in this repo yet
+# -- running this workflow before that secret is added will fail at the
+# "Run Wokwi simulation" step with an authentication error, not a
+# project defect. See docs/wokwi-simulation.md for the real, local
+# results this config is based on (a genuine root-caused fix, not a
+# guess) and exactly what adding the secret would let this workflow
+# confirm in a reproducible, non-local environment.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Install ESP32 board core
+        run: |
+          arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+          arduino-cli core install esp32:esp32 --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+
+      - name: Install libraries
+        run: |
+          arduino-cli lib install "DHT sensor library"
+          arduino-cli lib install "Adafruit Unified Sensor"
+          arduino-cli lib install "ArduinoJson"
+
+      - name: Compile irrigation_node for Wokwi
+        run: |
+          arduino-cli compile --fqbn esp32:esp32:esp32 \
+            --output-dir firmware/irrigation_node/build \
+            firmware/irrigation_node
+
+      - name: Run Wokwi simulation
+        uses: wokwi/wokwi-ci-action@v1
+        with:
+          token: ${{ secrets.WOKWI_CLI_TOKEN }}
+          path: firmware/irrigation_node/wokwi
+          timeout: 10000
+          expect_text: 'WOKWI_IRRIGATION_READY'
