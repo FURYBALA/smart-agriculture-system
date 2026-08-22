@@ -30,6 +30,19 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Runs before real AWS credentials are configured, deliberately:
+      # these tests exercise moto-mocked S3/SQS/DynamoDB, and moto's
+      # request interception is not reliable once real credentials are
+      # also present in the environment -- confirmed by an actual failed
+      # run where every moto-backed test hit real
+      # ResourceNotFoundException/QueueDoesNotExist errors instead of
+      # the mock. Sequencing this first avoids that interaction rather
+      # than working around it inside the test code.
+      - name: Install test deps and run backend pytest
+        run: |
+          pip install -r requirements-dev.txt
+          python -m pytest tests/ -v
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -67,11 +80,6 @@ jobs:
       - name: sam validate
         working-directory: backend/infrastructure
         run: sam validate --lint
-
-      - name: Install test deps and run backend pytest
-        run: |
-          pip install -r requirements-dev.txt
-          python -m pytest tests/ -v
 
       - name: sam build --use-container
         working-directory: backend/infrastructure
