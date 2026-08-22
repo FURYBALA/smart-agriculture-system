@@ -1,14 +1,21 @@
 # Smart Agriculture System with Plant Disease Detection
 
-A dual-node IoT + AI system: automated soil-moisture irrigation, and
-on-device + cloud tomato leaf disease diagnosis, unified in one
-Flutter mobile app backed by an optional serverless AWS pipeline.
+An end-to-end smart agriculture system combining ESP32 IoT irrigation
+control, camera-based on-device plant disease detection, an edge ML
+inference pipeline (custom CNN, INT8-quantized for TensorFlow Lite
+Micro), a Flutter mobile/web application, and a deployed serverless
+AWS backend. The complete pipeline — sensor/device interfaces →
+inference → cloud processing → persistence → user-facing diagnostics
+— is implemented and validated, not just diagrammed: a real AWS
+deployment answering live requests, a real circuit simulation passing
+in CI, and 38+ automated tests across firmware, backend, and mobile.
 
 [![Firmware compile check](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/firmware-compile.yml/badge.svg)](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/firmware-compile.yml)
 [![Flutter CI](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/flutter-ci.yml/badge.svg)](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/flutter-ci.yml)
 [![Backend CI](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/backend-ci.yml)
 [![Wokwi simulation](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/wokwi-simulation.yml/badge.svg)](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/wokwi-simulation.yml)
 [![License: MIT](https://img.shields.io/github/license/FURYBALA/smart-agriculture-system)](LICENSE)
+[![Release](https://img.shields.io/github/v/tag/FURYBALA/smart-agriculture-system?label=release)](https://github.com/FURYBALA/smart-agriculture-system/releases/tag/v1.0.0)
 
 Built for **21ECC301P — Microprocessor, Microcontroller and Interfacing
 Techniques**, SRM Institute of Science and Technology. Team and guide
@@ -30,6 +37,30 @@ in [`docs/team.md`](docs/team.md).
 | **What's real vs. simulated** | [Verification status](#verification-status) below, and [`docs/final-release-status.md`](docs/final-release-status.md) |
 | **For recruiters / reviewers** | [`docs/recruiter-version.md`](docs/recruiter-version.md), [`docs/project-presentation.md`](docs/project-presentation.md) (30s–5min explanations), [`docs/final-interview-preparation.md`](docs/final-interview-preparation.md) |
 | **Stack** | ESP32 · ESP32-CAM · TensorFlow Lite Micro · Flutter · AWS Lambda/API Gateway/S3/SQS/DynamoDB · GitHub Actions · Wokwi |
+
+Four categories, used consistently across every table in this repo —
+never blurred into each other:
+
+| | Means |
+|---|---|
+| **IMPLEMENTED** | Real, working code exists |
+| **VERIFIED** | Actually executed/deployed/observed for real (or against a real protocol-accurate stand-in, noted explicitly where that's the case) |
+| **BLOCKED** | A required external resource (physical hardware, a device) is genuinely unavailable |
+| **NOT SUPPORTED** | The tool itself can't do this, regardless of effort |
+
+## Proof of work
+
+Not a claim — a list of things you can independently check right now:
+
+- **Live AWS API**: `python demo/generate_demo_payload.py && curl -X POST https://p17huf2s49.execute-api.ap-south-1.amazonaws.com/prod/diagnose -H "Content-Type: application/json" -d @demo/payload.json` returns a real `diagnosisId` from a real deployed account — see [`docs/demo-assets.md`](docs/demo-assets.md)
+- **CI, green on every workflow**: [Actions tab](https://github.com/FURYBALA/smart-agriculture-system/actions) — firmware compile, Flutter, backend, and Wokwi simulation all passing on `main`
+- **Wokwi simulation, PASS in GitHub Actions**: [run `32560846142`](https://github.com/FURYBALA/smart-agriculture-system/actions/runs/32560846142) — real firmware, real boot log, deterministic `WOKWI_IRRIGATION_READY` marker
+- **Release tag**: [`v1.0.0`](https://github.com/FURYBALA/smart-agriculture-system/releases/tag/v1.0.0), tests green and tree clean at that commit
+- **Backend tests**: 19/19 `pytest`, real handler code, real model inference — [`backend/tests/test_lambda_handlers_local.py`](backend/tests/test_lambda_handlers_local.py)
+- **Flutter tests**: 19/19 `flutter test`, including a real integration test against a protocol-accurate ESP32 simulator
+- **Model validation**: checksum, class-label order, and INT8 quantization parameters cross-checked identical across `ml/models/training_metadata.json`, firmware, and backend
+- **Firmware tests**: real `g++` execution of production pump/vision logic — [`firmware/test/`](firmware/test/); real compile against actual ESP32 board definitions in CI
+- **Security checks**: full git history scanned for leaked credentials (none found); every Lambda's IAM policy resource-scoped, no wildcards — see [`docs/final-release-status.md`](docs/final-release-status.md) for the complete evidence table
 
 ## Highlights
 
@@ -253,6 +284,10 @@ confusion-matrix root-cause analysis:
   [`docs/differences-from-report.md`](docs/differences-from-report.md).
 
 ## Verification status
+
+More granular than the four-category framework above, but every status
+below maps onto exactly one of IMPLEMENTED / VERIFIED / BLOCKED / NOT
+SUPPORTED — none of these are a softer, blurred version of "pending."
 
 | Component | Verification | Status |
 |---|---|---|
