@@ -61,5 +61,9 @@ flutter test      # passing
 ```
 
 Both run automatically in CI on every push (see the badge on the repo
-root README). Hasn't been run on a physical device/emulator in the
+root README). Beyond that, a real, isolated headless Chromium (via
+Playwright) has actually loaded the built web app and clicked through
+all 6 screens with zero uncaught exceptions — see
+[`../docs/flutter-runtime.md`](../docs/flutter-runtime.md). What
+hasn't been run is a physical Android/iOS device or emulator in the
 environment this was built in — see the root README for that caveat.

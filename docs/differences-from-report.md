@@ -78,15 +78,18 @@ Diagnosis via Gemini Vision, History, Chatbot, Device Connectivity
 Tests). It's verified with `flutter analyze` (clean) and `flutter
 test` (passing) — real automated checks, not just "should work."
 
-## Cloud backend: written to match the diagram, not deployed
+## Cloud backend: written to match the diagram, and now actually deployed
 
 The report's Figure 3.3 shows an AWS architecture (API Gateway, S3,
 SQS, Lambda inference, DynamoDB) with no implementation detail in the
-text. `backend/` is a real, deployable AWS SAM implementation of that
-diagram — but nobody has run `sam deploy` on it. The mobile app's
-actual diagnosis flow calls Gemini Vision directly and doesn't need
-this backend at all; it exists as the self-hosted alternative the
-diagram describes. See [`backend/README.md`](../backend/README.md).
+text. `backend/` is a real AWS SAM implementation of that diagram, and
+it has actually been deployed and verified end-to-end for real (stack
+`smart-agriculture-system`, `ap-south-1` — see
+[`backend/README.md`](../backend/README.md#deployed-instance)). The
+mobile app's actual diagnosis flow still calls Gemini Vision directly
+and doesn't need this backend at all; it exists as the self-hosted
+alternative the diagram describes, deployed to prove the architecture
+is real and not just diagrammed.
 
 ## What's still unverified
 
@@ -102,6 +105,9 @@ diagram describes. See [`backend/README.md`](../backend/README.md).
   your first flash.
 - **The Flutter app compiles and passes its checks — verified, not
   assumed.** `flutter analyze` (clean) and `flutter test` (passing)
-  run in CI on every push. What's still unverified is **running on an
-  actual device or emulator** — no Android/iOS emulator, Chrome, or
-  Visual Studio C++ toolchain was available here to launch it.
+  run in CI on every push, and a real, isolated headless Chromium (via
+  Playwright) has actually loaded the built web app and clicked
+  through all 6 screens — see
+  [`flutter-runtime.md`](flutter-runtime.md). What's still unverified
+  is **running on an actual Android/iOS device or emulator** — none was
+  available here to launch it.

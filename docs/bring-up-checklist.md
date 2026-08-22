@@ -64,6 +64,11 @@ Verified with `flutter analyze` (clean) and `flutter test` (passing)
 
 ## Cloud backend (`backend`)
 
-Not deployed — see `backend/README.md` for the `sam build --use-container
-&& sam deploy --guided` steps and the model-file/class-label sync step
-required before it'll return correct results.
+Already deployed and verified for real (see
+[`backend/README.md`](../backend/README.md#deployed-instance)) — the
+firmware and mobile app don't call it today (the mobile app's diagnosis
+path calls Gemini Vision directly), so nothing here depends on it. If
+you want your own copy instead of, or alongside, that deployment, see
+`backend/README.md` for the `sam build --use-container && sam deploy
+--guided` steps and the model-file/class-label sync step required
+before it'll return correct results.

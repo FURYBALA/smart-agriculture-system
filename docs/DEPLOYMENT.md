@@ -12,7 +12,7 @@ first if you only read one section — it sets expectations for what
 
 ## 0. What this repo has verified vs. what it hasn't
 
-Four different claims get made throughout this document, and they mean
+Six different claims get made throughout this document, and they mean
 different things:
 
 | Label | Means |
@@ -20,10 +20,15 @@ different things:
 | **CI VALIDATION** | Compiled/built/tested automatically on every push to this repo — real, repeatable, checkable in the Actions tab |
 | **LOCAL TESTING** | Run once, by hand, in this project's development environment (no physical hardware, device, or AWS account) |
 | **SIMULATED TESTING** | Run against a stand-in (the local ESP32 REST simulator, `moto`-mocked AWS) that matches the real contract but isn't the real thing |
-| **PHYSICAL VALIDATION** | Actually run on real ESP32 hardware, a real phone/emulator, or a deployed AWS stack — **this is the status that is still pending everywhere in this document** |
+| **AWS DEPLOYMENT VALIDATION** | Actually run against the real, live deployed AWS stack (`smart-agriculture-system`, `ap-south-1`) — real API Gateway, real Lambda, real DynamoDB, not a mock. See [`backend/README.md`](../backend/README.md#deployed-instance) |
+| **REAL BROWSER RUNTIME** | Actually run in a real, isolated headless Chromium browser (via Playwright) — the app genuinely loaded and was clicked through, not just compiled. See [`flutter-runtime.md`](flutter-runtime.md) |
+| **PHYSICAL VALIDATION** | Actually run on real ESP32 hardware, or a real/emulated Android/iOS device — **this is the one category still genuinely pending everywhere in this document; no physical hardware or mobile device/emulator is available in this environment** |
 
-Nothing in this repository claims physical validation. Every step below
-says explicitly which of the first three categories it's backed by.
+Two categories that used to always mean "still pending" here no longer
+do: AWS deployment and browser runtime are both real now (see the two
+rows above). Physical ESP32 hardware and a physical/emulated mobile
+device remain the genuine, unavoidable gap — every step below says
+explicitly which category it's backed by.
 
 ## Prerequisites
 
@@ -240,7 +245,8 @@ what this does and doesn't prove.
 
 ## 11. Verify backend
 
-**Status: CI VALIDATION + SIMULATED TESTING — not deployed.**
+**Status: CI VALIDATION + SIMULATED TESTING, plus real AWS DEPLOYMENT
+VALIDATION against the live instance from step 6.**
 
 ```bash
 cd backend
@@ -248,14 +254,18 @@ python -m pytest tests/ -v          # 19 tests against moto-mocked AWS
 cd infrastructure && sam validate --lint && sam build --use-container
 ```
 
-If you completed step 6 (real deployment), also run the `curl` smoke
-test in [`backend/README.md`](../backend/README.md)'s "Deploying"
-section against your real `ApiUrl` — that step is genuinely PHYSICAL
-VALIDATION once you've done it.
+Step 6's deployment is real and already verified end-to-end (see
+[`backend/README.md`](../backend/README.md#deployed-instance)) — the
+`curl` smoke test in that section's "Deploying" step was already run
+for real against it. If you deploy your own separate copy instead, run
+that same smoke test against your own `ApiUrl` to get the same
+PHYSICAL VALIDATION for it.
 
 ## 12. Verify mobile application
 
-**Status: CI VALIDATION + SIMULATED TESTING (against the local ESP32 simulator) — not PHYSICAL/EMULATOR VALIDATION.**
+**Status: CI VALIDATION + SIMULATED TESTING (against the local ESP32
+simulator), plus a real browser runtime check — native Android/iOS
+device or emulator remains not PHYSICAL/EMULATOR VALIDATION.**
 
 ```bash
 cd mobile_app
@@ -263,7 +273,13 @@ dart run tool/esp32_simulator.dart &     # in one terminal
 flutter test test/esp32_simulator_integration_test.dart
 ```
 This runs the real, unmodified `Esp32Service` against a local server
-matching the real firmware's exact contract.
+matching the real firmware's exact contract. Separately, a real
+isolated headless Chromium (via Playwright) actually loaded the built
+web app and was driven through all 6 screens by real clicks, with zero
+uncaught exceptions — see
+[`flutter-runtime.md`](flutter-runtime.md) for that method and what it
+did and didn't confirm (a native Android/iOS device or emulator run is
+still what's missing).
 
 ## 13. End-to-end test
 
