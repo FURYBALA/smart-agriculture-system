@@ -34,7 +34,18 @@ LAMBDA_DIR = BACKEND_DIR / "lambda_functions"
 # Mirrors how AWS actually wires a Lambda Layer onto the import path
 # (the real deployed function has this on sys.path automatically via
 # /opt/python; there is no local equivalent, so it's added by hand here).
-sys.path.insert(0, str(LAMBDA_DIR / "common_layer" / "python"))
+#
+# common_layer/'s source is common.py directly (no python/ subfolder) --
+# SAM's BuildMethod: python3.12 for this layer adds that python/ prefix
+# itself during `sam build`. A python/ subfolder already present in the
+# source got double-wrapped into python/python/common.py in the actual
+# deployed layer zip, which Lambda could never import as `common` --
+# found via a real deployment's CloudWatch logs
+# (Runtime.ImportModuleError: No module named 'common'), not caught by
+# this test file, because pointing sys.path at the source directly
+# bypasses SAM's build step entirely and had been silently tolerating
+# the wrong source layout.
+sys.path.insert(0, str(LAMBDA_DIR / "common_layer"))
 
 BUCKET_NAME = "test-leaf-images"
 QUEUE_NAME = "test-inference-queue"
