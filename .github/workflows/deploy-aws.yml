@@ -1,0 +1,100 @@
+name: Deploy AWS Backend (manual, one-off)
+
+# Manual-only, deliberately: this workflow creates real, billable AWS
+# resources via `sam deploy`. It must never run on push/PR -- only an
+# explicit, human-triggered workflow_dispatch. See docs/DEPLOYMENT.md
+# for what gets created and docs/backend-local-testing.md for why this
+# needs CI's Docker rather than running locally.
+#
+# Deployment region is intentionally fixed to ap-south-1 in the actual
+# build/deploy commands below, not taken solely from the AWS_REGION
+# secret -- that secret is still used to configure credentials (as
+# aws-actions/configure-aws-credentials requires a region), but is
+# separately validated to equal ap-south-1 before any build/deploy step
+# runs, so a wrong/stale secret value can't silently redirect a real
+# deployment to an unintended region.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Verify AWS_REGION secret matches the fixed deployment region
+        run: |
+          if [ "${{ secrets.AWS_REGION }}" != "ap-south-1" ]; then
+            echo "AWS_REGION secret does not equal the fixed deployment region ap-south-1 -- aborting before any build/deploy step runs."
+            exit 1
+          fi
+          echo "AWS_REGION secret confirmed to match ap-south-1."
+
+      - name: Verify AWS identity (account/ARN only, never secrets)
+        run: aws sts get-caller-identity --region ap-south-1
+
+      - name: Verify canonical model exists and checksum it
+        run: |
+          test -f ../ml/models/tomato_disease_model_int8.tflite
+          sha256sum ../ml/models/tomato_disease_model_int8.tflite
+
+      - name: Copy model into inference_handler, verify identical checksum
+        run: |
+          cp ../ml/models/tomato_disease_model_int8.tflite lambda_functions/inference_handler/
+          src=$(sha256sum ../ml/models/tomato_disease_model_int8.tflite | cut -d' ' -f1)
+          dst=$(sha256sum lambda_functions/inference_handler/tomato_disease_model_int8.tflite | cut -d' ' -f1)
+          echo "source: $src"; echo "copied: $dst"
+          [ "$src" = "$dst" ]
+
+      - name: Install AWS SAM CLI
+        run: pip install aws-sam-cli
+
+      - name: sam validate
+        working-directory: backend/infrastructure
+        run: sam validate --lint
+
+      - name: Install test deps and run backend pytest
+        run: |
+          pip install -r requirements-dev.txt
+          python -m pytest tests/ -v
+
+      - name: sam build --use-container
+        working-directory: backend/infrastructure
+        run: sam build --use-container
+        env:
+          SAM_CLI_TELEMETRY: "0"
+
+      - name: sam deploy
+        working-directory: backend/infrastructure
+        run: |
+          sam deploy \
+            --stack-name smart-agriculture-system \
+            --region ap-south-1 \
+            --resolve-s3 \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset
+        env:
+          SAM_CLI_TELEMETRY: "0"
+
+      - name: Show stack outputs (non-secret)
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name smart-agriculture-system \
+            --region ap-south-1 \
+            --query "Stacks[0].Outputs"
