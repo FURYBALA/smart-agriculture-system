@@ -33,6 +33,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_1_8
     }
 
+    kotlinOptions {
+        // Must match compileOptions above -- AGP 8's Kotlin plugin
+        // otherwise infers the JVM target from the JDK actually running
+        // Gradle (21 here), which fails with "Inconsistent JVM-target
+        // compatibility" against the Java side pinned to 1.8.
+        jvmTarget = "1.8"
+    }
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.furybala.plant_doctor"

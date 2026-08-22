@@ -13,10 +13,6 @@ flutter devices
 - **Physical Android/iOS device**: none connected.
 - **Android emulator**: none configured (`flutter emulators` lists
   none; creating one needs downloading a system image, not done here).
-  The Android SDK itself is also incomplete in this environment
-  (`flutter doctor` flags a missing `cmdline-tools` component and
-  unaccepted licenses), so even building an installable APK isn't
-  currently clean, separate from having anywhere to run it.
 - **Windows desktop**: `flutter devices` lists it, but `flutter doctor`
   flags Visual Studio (with the "Desktop development with C++"
   workload) as not installed -- required to actually compile a Windows
@@ -89,10 +85,41 @@ So:
   Disease Diagnosis, Chatbot, Device Tests) render and behave correctly
   in a browser is also unconfirmed for the same reason.
 
+## Android release APK: real build fix, real success
+
+`flutter build apk --release` initially failed -- not on this project's
+code, but on the Android build toolchain itself. Diagnosed and fixed in
+two steps, each confirmed with the actual next build attempt rather
+than guessed:
+
+1. **Gradle/JDK mismatch.** The project's default Gradle 7.6.3 doesn't
+   support JDK 21 (Android Studio's currently-bundled JDK, which is
+   what Flutter's Gradle invocation uses by default here). Bumped to
+   Gradle 8.4 + AGP 8.1.0 + Kotlin 1.9.24 -- the standard, documented
+   combination for JDK 21.
+2. **Kotlin/Java JVM-target mismatch.** With that fixed, a second, more
+   specific error appeared: `compileReleaseJavaWithJavac` (target 1.8,
+   from `app/build.gradle`'s existing `compileOptions`) and
+   `compileReleaseKotlin` (inferring target 21 from the JDK, since
+   nothing pinned it) disagreed. Fixed by adding an explicit
+   `kotlinOptions { jvmTarget = "1.8" }` to match the Java side.
+
+After both fixes:
+```
+√ Built build\app\outputs\flutter-apk\app-release.apk (20.7MB)
+```
+A real, verified file on disk -- confirmed with `ls`, not just a
+"BUILD SUCCESSFUL" message. **What this doesn't prove**: the APK has
+never been installed on a device or emulator, so nothing about its
+actual runtime behavior is known -- only that it exists and is a valid
+build output.
+
 ## Bottom line
 
-Flutter web is now a genuinely useful **compile-time** smoke test (real,
-in CI, catching real compile errors before they'd otherwise surface).
-It is not, and isn't claimed to be, a substitute for running this
-mobile-first app on an actual Android/iOS device or emulator -- that
-remains externally blocked, same as physical ESP32 hardware.
+Flutter web (`flutter build web`) and Android (`flutter build apk
+--release`) are both now genuinely working **compile/build-time**
+checks -- the Android one only after a real, non-trivial toolchain fix,
+not assumed to work from `flutter doctor` looking clean. Neither is,
+or is claimed to be, a substitute for actually running this app on a
+device, emulator, or browser and watching it work -- that remains
+externally blocked, same as physical ESP32 hardware.

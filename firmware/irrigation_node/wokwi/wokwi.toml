@@ -1,6 +1,6 @@
-# Wokwi simulation config for the irrigation node. NOT executed as part
-# of this repo's verification -- see ../../../docs/wokwi-simulation.md
-# for exactly what that means and what it would take to run it.
+# Wokwi simulation config for the irrigation node. See
+# ../../../docs/wokwi-simulation.md for real, actually-attempted
+# results -- do not assume this passes.
 [wokwi]
 version = 1
 firmware = "../build/irrigation_node.ino.bin"

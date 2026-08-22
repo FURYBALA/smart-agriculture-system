@@ -7,6 +7,17 @@ venv/
 
 # AWS SAM build output
 backend/infrastructure/.aws-sam/
+backend/infrastructure/samconfig.toml
+
+# Pre-deploy step (see backend/README.md "Before deploying") copies the
+# model here for packaging -- one tracked source of truth in ml/models/
+# instead of two copies that can silently drift.
+backend/lambda_functions/inference_handler/*.tflite
+
+# arduino-cli --output-dir compile artifacts (.bin/.elf/.map) -- also
+# what Wokwi's wokwi.toml points at locally; never committed
+firmware/irrigation_node/build/
+firmware/vision_node/build/
 
 # OS
 .DS_Store

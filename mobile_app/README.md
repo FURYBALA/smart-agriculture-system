@@ -31,14 +31,23 @@ for the ESP32 hardware this app talks to.
 ```bash
 flutter build apk --release
 ```
-Output: `build/app/outputs/flutter-apk/app-release.apk`. Requires a
-complete Android SDK (`flutter doctor` should show no `[X]` under the
-Android toolchain) -- not verified in this project's dev environment,
-where the Android SDK's `cmdline-tools` component and licenses were
-incomplete (see [`../docs/flutter-runtime.md`](../docs/flutter-runtime.md)).
+Output: `build/app/outputs/flutter-apk/app-release.apk`. **Actually
+builds** -- verified by really running it, producing a real ~20.7 MB
+APK, not assumed from `flutter doctor` looking clean. Getting there
+required a genuine fix: the project's default Gradle 7.6.3 / AGP 7.3.0
+/ Kotlin 1.7.10 combination doesn't support JDK 21 (what Android
+Studio's bundled JDK currently ships), so the build failed until
+bumped to Gradle 8.4 / AGP 8.1.0 / Kotlin 1.9.24, with an explicit
+`kotlinOptions.jvmTarget = "1.8"` added to keep bytecode output
+matching the existing `compileOptions` (Gradle 8's Kotlin plugin
+otherwise infers the target from the JDK, not from `compileOptions`,
+which produced a second, different mismatch error). See
+[`../docs/flutter-runtime.md`](../docs/flutter-runtime.md) for the full
+diagnosis.
 Install the resulting APK on a device or emulator with
 `adb install app-release.apk`, or `flutter install` with a device
-connected.
+connected -- **that install/launch step itself has not been done**;
+the APK's existence is verified, its behavior on a real device is not.
 
 For iOS, this project has no Apple Developer account or macOS build
 environment behind it -- `flutter build ios` and code signing are

@@ -16,21 +16,21 @@
       "id": "soil_pot",
       "top": 40,
       "left": 80,
-      "attrs": { "label": "soil moisture stand-in (see note below)" }
+      "attrs": {}
     },
-    { "type": "wokwi-led", "id": "pump_led", "top": 100, "left": 80, "attrs": { "color": "blue", "label": "pump (via relay)" } },
+    { "type": "wokwi-led", "id": "pump_led", "top": 100, "left": 80, "attrs": { "color": "blue" } },
     { "type": "wokwi-resistor", "id": "r1", "top": 100, "left": 130, "attrs": { "value": "220" } }
   ],
   "connections": [
-    ["esp32:D4", "dht:SDA", "green", ["v0"]],
+    ["esp32:4", "dht:SDA", "green", ["v0"]],
     ["dht:VCC", "esp32:3V3", "red", ["v0"]],
     ["dht:GND", "esp32:GND.1", "black", ["v0"]],
 
-    ["esp32:D34", "soil_pot:SIG", "yellow", ["v0"]],
+    ["esp32:34", "soil_pot:SIG", "yellow", ["v0"]],
     ["soil_pot:VCC", "esp32:3V3", "red", ["v0"]],
     ["soil_pot:GND", "esp32:GND.2", "black", ["v0"]],
 
-    ["esp32:D27", "r1:1", "orange", ["v0"]],
+    ["esp32:27", "r1:1", "orange", ["v0"]],
     ["r1:2", "pump_led:A", "orange", ["v0"]],
     ["pump_led:C", "esp32:GND.3", "black", ["v0"]]
   ],
