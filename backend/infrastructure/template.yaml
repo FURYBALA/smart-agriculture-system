@@ -5,8 +5,10 @@ Description: >
   the project report (Figure 3.3): API Gateway -> S3 (image storage) ->
   SQS -> Lambda inference -> DynamoDB (results + chat history).
 
-  Not deployed anywhere by default -- see backend/README.md. Deploying
-  this creates real billable AWS resources.
+  This template itself deploys nothing by just existing in the repo --
+  see backend/README.md for the actually-deployed instance's real
+  status, and for how to deploy your own separate copy (which creates
+  real billable AWS resources).
 
 Globals:
   Function:

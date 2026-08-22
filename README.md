@@ -26,9 +26,9 @@ in [`docs/team.md`](docs/team.md).
 | | |
 |---|---|
 | **Live AWS API** | [`https://p17huf2s49.execute-api.ap-south-1.amazonaws.com/prod/`](https://p17huf2s49.execute-api.ap-south-1.amazonaws.com/prod/diagnose) — deployed, region `ap-south-1`, stack `smart-agriculture-system` |
-| **Try it now (no hardware needed)** | [`docs/demo-guide.md`](docs/demo-guide.md) — 5-minute and 10-minute walkthroughs using Wokwi + Flutter web + the live AWS API |
-| **What's real vs. simulated** | [Verification status](#verification-status) below, and [`docs/final-validation-matrix.md`](docs/final-validation-matrix.md) |
-| **For recruiters / reviewers** | [`docs/project-presentation.md`](docs/project-presentation.md) (30s–5min explanations), [`docs/resume-project-entry.md`](docs/resume-project-entry.md), [`docs/interview-preparation.md`](docs/interview-preparation.md) |
+| **Try it now (no hardware needed)** | [`docs/demo-guide.md`](docs/demo-guide.md) / [`docs/final-demo.md`](docs/final-demo.md) — 5-minute and 10-minute walkthroughs using Wokwi + Flutter web + the live AWS API |
+| **What's real vs. simulated** | [Verification status](#verification-status) below, and [`docs/final-release-status.md`](docs/final-release-status.md) |
+| **For recruiters / reviewers** | [`docs/recruiter-version.md`](docs/recruiter-version.md), [`docs/project-presentation.md`](docs/project-presentation.md) (30s–5min explanations), [`docs/final-interview-preparation.md`](docs/final-interview-preparation.md) |
 | **Stack** | ESP32 · ESP32-CAM · TensorFlow Lite Micro · Flutter · AWS Lambda/API Gateway/S3/SQS/DynamoDB · GitHub Actions · Wokwi |
 
 ## Highlights
@@ -419,6 +419,14 @@ generic list:
 | [`docs/interview-preparation.md`](docs/interview-preparation.md) | Likely technical interview questions with concise answers |
 | [`docs/resume-project-entry.md`](docs/resume-project-entry.md) | Resume bullet variants and ATS keywords |
 | [`docs/linkedin-project-post.md`](docs/linkedin-project-post.md) | A draft project announcement post |
+| [`docs/recruiter-version.md`](docs/recruiter-version.md) | Role-specific pitches (Software/Full Stack/ML/Embedded/Cloud Engineer) |
+| [`docs/final-demo.md`](docs/final-demo.md) | The full spoken demo script (5-10 minutes, section by section) |
+| [`docs/demo-assets.md`](docs/demo-assets.md) | The reproducible demo payload generator and how to use it |
+| [`docs/architecture.md`](docs/architecture.md) | Full system diagram with per-link verification status |
+| [`docs/technical-deep-dive.md`](docs/technical-deep-dive.md) | Implementation-level reference, written from the actual source |
+| [`docs/final-interview-preparation.md`](docs/final-interview-preparation.md) | 50 questions across 25 categories, with follow-ups |
+| [`docs/final-release-status.md`](docs/final-release-status.md) | The single source of truth: every component's PASS/IMPLEMENTED/SIMULATED/BLOCKED/NOT SUPPORTED/INCONCLUSIVE status |
+| [`docs/release-checklist.md`](docs/release-checklist.md) | Checkbox-by-checkbox release readiness, evidence-based |
 | [`docs/final-validation-matrix.md`](docs/final-validation-matrix.md) | Every component's real status: PASS / SIMULATED / BLOCKED / NOT SUPPORTED |
 | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Full start-from-zero setup, every component |
 | [`docs/end-to-end-test-plan.md`](docs/end-to-end-test-plan.md) | The complete test matrix, per test case |
