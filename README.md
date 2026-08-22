@@ -170,7 +170,7 @@ still does.
 | ML inference | Same test file, real `ai-edge-litert` interpreter loading the actual shipped `.tflite` model | Input/output tensor shapes and quantization match `training_metadata.json`; a full S3→preprocess→invoke→DynamoDB run returns a valid class + confidence |
 | Backend deployment | `sam validate` + `sam build --use-container` in CI, then a real `sam deploy` via a manual GitHub Actions workflow | **Deployed for real** to `ap-south-1` — 21/21 resources `CREATE_COMPLETE`, a live API smoke test passing end-to-end |
 | Flutter web | `flutter build web` in CI | The app's non-platform-specific code compiles cleanly — see [`docs/flutter-runtime.md`](docs/flutter-runtime.md) for what this does and doesn't prove |
-| ESP32 hardware bring-up simulation | [Wokwi](https://wokwi.com) config for the irrigation node, run with a real token against Wokwi's real API | ⚠️ Attempted for real — found and fixed 2 config bugs, but the simulation itself connects and then stalls with no output (ruled out as a firmware issue via a trivial sanity-sketch test); see [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md) for the full diagnosis |
+| ESP32 hardware bring-up simulation | [Wokwi](https://wokwi.com) config for the irrigation node, run with a real token against Wokwi's real API | ✅ **Passing** — root-caused a real missing `diagram.json` serial-monitor connection (not a firmware or environment issue as earlier attempts suggested) and fixed it; the real compiled firmware now boots and prints a deterministic `WOKWI_IRRIGATION_READY` marker, `--expect-text` confirms it, exit code 0; see [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md) for the full diagnosis and history |
 
 ## ML model
 
@@ -253,7 +253,7 @@ confusion-matrix root-cause analysis:
 | **AWS deployment** | **Deployed for real** via a manual GitHub Actions workflow (`ap-south-1`, stack `smart-agriculture-system`) — all 21 resources `CREATE_COMPLETE`; a real API smoke test (upload → S3 → SQS → real model inference → DynamoDB → poll) and the chat endpoints both verified against the live API; found and fixed a real Lambda Layer packaging bug in the process | ✅ **Deployed and verified** — see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md#6-deploy-aws-backend-optional) |
 | ML inference | Real `.tflite` model loaded and run through `ai-edge-litert` — locally, and for real in the deployed Lambda; tensor shapes/quantization cross-checked against `training_metadata.json` | ✅ Runs correctly — see caveat below |
 | ML pipeline consistency | Class-label order and quantization params cross-checked across firmware headers, backend, and training metadata | ✅ Consistent |
-| ESP32 hardware bring-up | Wokwi simulation, run with a real token | ⚠️ Attempted, twice on separate dates, same result — connects to the real API, stalls at 0 bytes of serial output before completing; not a firmware defect (ruled out both times with an independent trivial sanity sketch) |
+| ESP32 hardware bring-up simulation | Wokwi simulation, run with a real token | ✅ **Passing** — root cause found (a missing `diagram.json` serial-monitor wiring, not a firmware/environment problem as two earlier attempts suggested) and fixed; real firmware boots and prints a deterministic boot marker, confirmed by `--expect-text`, exit code 0. GitHub Actions workflow created for reproducibility, currently blocked only on a missing `WOKWI_CLI_TOKEN` repo secret — see [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md) |
 | Physical ESP32/ESP32-CAM hardware | Flashing and hardware bring-up | ⏳ Pending — no hardware available in the development environment |
 | Flutter web runtime | A real, isolated headless Chromium (via Playwright) actually loading the built app and clicking through all 6 screens | ✅ **Runs correctly** — 0 uncaught exceptions; found and fixed a real bug along the way (History screen's database didn't work at all on web) — see [`docs/flutter-runtime.md`](docs/flutter-runtime.md) |
 | Mobile native runtime | Running on a physical Android/iOS device or emulator | ⏳ Pending — no device/emulator available in the development environment |
@@ -320,13 +320,19 @@ genuinely external is narrower than it used to be:
   Wi-Fi, timing) is not — go through
   [`docs/bring-up-checklist.md`](docs/bring-up-checklist.md) before a
   first flash rather than assuming it. A Wokwi simulation for the
-  irrigation node was actually attempted with a real token against
-  Wokwi's real API, twice on two different dates — it found and fixed
-  two real config bugs, then connects successfully but stalls before
-  completing, for reasons confirmed unrelated to this project's
-  firmware (a trivial sanity sketch fails identically, both times) —
-  see [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md) for the
-  full, honest diagnosis.
+  irrigation node **now genuinely passes**: two earlier attempts
+  (real token, real API, real firmware) each connected but stalled with
+  zero serial output, including with an independent trivial sanity
+  sketch, which looked like an environment/service limitation. It
+  wasn't -- diffing against Wokwi's own official example project found
+  the real cause (a missing serial-monitor connection in
+  `diagram.json`), and with that fixed, the real compiled firmware
+  boots and prints a deterministic marker every time, confirmed by
+  `wokwi-cli --expect-text`. This only ever validates boot/Serial/GPIO
+  behavior in simulation, not real camera, real relay/pump electrical
+  behavior, or real hardware timing — see
+  [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md) for the full
+  history and exactly what is and isn't covered.
 - **Flutter on a physical device or emulator.** No physical Android/iOS
   device or emulator was available, so the release APK
   (`flutter build apk --release`, a real, verified 20.7MB file after
