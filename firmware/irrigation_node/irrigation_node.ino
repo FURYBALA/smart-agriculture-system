@@ -193,6 +193,12 @@ void connectWiFi() {
 void setup() {
   Serial.begin(115200);
   delay(300);
+  // Earliest possible checkpoint, printed unconditionally before Wi-Fi/
+  // sensor init -- confirms the board booted and Serial is alive even if
+  // everything after this hangs (e.g. Wi-Fi never connecting). Doubles as
+  // a real bring-up aid and a deterministic marker for automated
+  // simulation checks (see firmware/irrigation_node/wokwi/).
+  Serial.println("WOKWI_IRRIGATION_READY");
 
   pinMode(RELAY_PIN, OUTPUT);
   setPumpOutput(false);

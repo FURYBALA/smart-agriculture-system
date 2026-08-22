@@ -32,7 +32,13 @@
 
     ["esp32:27", "r1:1", "orange", ["v0"]],
     ["r1:2", "pump_led:A", "orange", ["v0"]],
-    ["pump_led:C", "esp32:GND.3", "black", ["v0"]]
+    ["pump_led:C", "esp32:GND.3", "black", ["v0"]],
+
+    ["esp32:TX", "$serialMonitor:RX", "", []],
+    ["esp32:RX", "$serialMonitor:TX", "", []]
   ],
+  "serialMonitor": {
+    "display": "terminal"
+  },
   "dependencies": {}
 }

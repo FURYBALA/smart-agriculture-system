@@ -19,6 +19,11 @@ backend/lambda_functions/inference_handler/*.tflite
 firmware/irrigation_node/build/
 firmware/vision_node/build/
 
+# wokwi-cli --serial-log-file output -- a real, useful debugging aid
+# locally, but a run-specific artifact, not project source
+firmware/**/wokwi-serial.log
+firmware/**/*.wokwi-serial.log
+
 # OS
 .DS_Store
 Thumbs.db
