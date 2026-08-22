@@ -7,6 +7,7 @@ Flutter mobile app backed by an optional serverless AWS pipeline.
 [![Firmware compile check](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/firmware-compile.yml/badge.svg)](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/firmware-compile.yml)
 [![Flutter CI](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/flutter-ci.yml/badge.svg)](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/flutter-ci.yml)
 [![Backend CI](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/backend-ci.yml)
+[![Wokwi simulation](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/wokwi-simulation.yml/badge.svg)](https://github.com/FURYBALA/smart-agriculture-system/actions/workflows/wokwi-simulation.yml)
 [![License: MIT](https://img.shields.io/github/license/FURYBALA/smart-agriculture-system)](LICENSE)
 
 Built for **21ECC301P — Microprocessor, Microcontroller and Interfacing
@@ -19,6 +20,16 @@ in [`docs/team.md`](docs/team.md).
 > account to deploy to) — every substitution is documented plainly in
 > [`docs/differences-from-report.md`](docs/differences-from-report.md).
 > Nothing here claims results it didn't actually produce.
+
+## At a glance
+
+| | |
+|---|---|
+| **Live AWS API** | [`https://p17huf2s49.execute-api.ap-south-1.amazonaws.com/prod/`](https://p17huf2s49.execute-api.ap-south-1.amazonaws.com/prod/diagnose) — deployed, region `ap-south-1`, stack `smart-agriculture-system` |
+| **Try it now (no hardware needed)** | [`docs/demo-guide.md`](docs/demo-guide.md) — 5-minute and 10-minute walkthroughs using Wokwi + Flutter web + the live AWS API |
+| **What's real vs. simulated** | [Verification status](#verification-status) below, and [`docs/final-validation-matrix.md`](docs/final-validation-matrix.md) |
+| **For recruiters / reviewers** | [`docs/project-presentation.md`](docs/project-presentation.md) (30s–5min explanations), [`docs/resume-project-entry.md`](docs/resume-project-entry.md), [`docs/interview-preparation.md`](docs/interview-preparation.md) |
+| **Stack** | ESP32 · ESP32-CAM · TensorFlow Lite Micro · Flutter · AWS Lambda/API Gateway/S3/SQS/DynamoDB · GitHub Actions · Wokwi |
 
 ## Highlights
 
@@ -364,6 +375,54 @@ no local test could have caught). What that deployment does *not*
 prove: the firmware doesn't call this API at all (see the architecture
 diagram), and the mobile app's own diagnosis path still calls Gemini
 Vision directly, unchanged.
+
+## Skills demonstrated
+
+Grounded in the specific, verified work in this repository, not a
+generic list:
+
+- **Embedded systems**: C++ on ESP32 (Arduino framework), REST API
+  design over `WebServer`, sensor drivers (DHT11, analog ADC),
+  relay/GPIO control with a real safety timer state machine, PSRAM
+  memory management for a TFLite Micro tensor arena, RGB565 camera
+  frame decoding
+- **Machine learning**: CNN design and training from scratch (Keras),
+  post-training INT8 quantization for microcontroller deployment,
+  root-causing an accuracy regression via image-by-image float-vs-
+  quantized comparison rather than assuming the obvious cause
+- **Mobile development**: Flutter/Dart, `Provider` state management,
+  platform-conditional persistence (`sqflite` native vs.
+  `sqflite_common_ffi_web` on web), async integration testing against
+  a local protocol-accurate simulator
+- **Cloud/backend**: AWS serverless architecture (API Gateway, Lambda,
+  S3, SQS, DynamoDB) as infrastructure-as-code (SAM), async
+  upload→queue→process→poll pipeline design, IAM least-privilege
+  policy scoping, real deployment via GitHub Actions with masked
+  secrets
+- **DevOps/CI**: 5 GitHub Actions workflows (firmware, Flutter,
+  backend, AWS deploy, Wokwi simulation), multi-language test
+  automation (C++, Dart, Python), root-causing CI-only failures (a
+  `moto`/real-credential test-ordering conflict, a Lambda Layer
+  double-nesting bug) that, by definition, never reproduced locally
+- **Testing discipline**: host-side unit tests for hardware-independent
+  logic, integration tests against a real protocol-accurate simulator,
+  real headless-browser end-to-end testing (Playwright), and a written
+  policy against claiming untested capabilities as working — enforced
+  throughout this README and every doc it links to
+
+## Documentation index
+
+| Doc | What it's for |
+|---|---|
+| [`docs/demo-guide.md`](docs/demo-guide.md) | Step-by-step demo procedure — no physical hardware needed |
+| [`docs/project-presentation.md`](docs/project-presentation.md) | 30-second to 5-minute spoken explanations, by audience/topic |
+| [`docs/interview-preparation.md`](docs/interview-preparation.md) | Likely technical interview questions with concise answers |
+| [`docs/resume-project-entry.md`](docs/resume-project-entry.md) | Resume bullet variants and ATS keywords |
+| [`docs/linkedin-project-post.md`](docs/linkedin-project-post.md) | A draft project announcement post |
+| [`docs/final-validation-matrix.md`](docs/final-validation-matrix.md) | Every component's real status: PASS / SIMULATED / BLOCKED / NOT SUPPORTED |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Full start-from-zero setup, every component |
+| [`docs/end-to-end-test-plan.md`](docs/end-to-end-test-plan.md) | The complete test matrix, per test case |
+| [`docs/differences-from-report.md`](docs/differences-from-report.md) | What was rebuilt vs. carried over from the original report |
 
 ## License
 
