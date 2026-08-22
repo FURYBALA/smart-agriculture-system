@@ -170,7 +170,7 @@ still does.
 | ML inference | Same test file, real `ai-edge-litert` interpreter loading the actual shipped `.tflite` model | Input/output tensor shapes and quantization match `training_metadata.json`; a full S3→preprocess→invoke→DynamoDB run returns a valid class + confidence |
 | Backend deployment | `sam validate` + `sam build --use-container` in CI, then a real `sam deploy` via a manual GitHub Actions workflow | **Deployed for real** to `ap-south-1` — 21/21 resources `CREATE_COMPLETE`, a live API smoke test passing end-to-end |
 | Flutter web | `flutter build web` in CI | The app's non-platform-specific code compiles cleanly — see [`docs/flutter-runtime.md`](docs/flutter-runtime.md) for what this does and doesn't prove |
-| ESP32 hardware bring-up simulation | [Wokwi](https://wokwi.com) config for the irrigation node, run with a real token against Wokwi's real API | ✅ **Passing** — root-caused a real missing `diagram.json` serial-monitor connection (not a firmware or environment issue as earlier attempts suggested) and fixed it; the real compiled firmware now boots and prints a deterministic `WOKWI_IRRIGATION_READY` marker, `--expect-text` confirms it, exit code 0; see [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md) for the full diagnosis and history |
+| ESP32 hardware bring-up simulation | [Wokwi](https://wokwi.com) config for the irrigation node, run with a real token against Wokwi's real API | ✅ **Passing, locally and in GitHub Actions** — root-caused a real missing `diagram.json` serial-monitor connection (not a firmware or environment issue as earlier attempts suggested) and fixed it; the real compiled firmware boots and prints a deterministic `WOKWI_IRRIGATION_READY` marker, confirmed by `--expect-text` on this machine and independently on a clean `ubuntu-latest` GitHub Actions runner ([run `32560846142`](https://github.com/FURYBALA/smart-agriculture-system/actions/runs/32560846142)); see [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md) for the full diagnosis and history |
 
 ## ML model
 
@@ -253,7 +253,7 @@ confusion-matrix root-cause analysis:
 | **AWS deployment** | **Deployed for real** via a manual GitHub Actions workflow (`ap-south-1`, stack `smart-agriculture-system`) — all 21 resources `CREATE_COMPLETE`; a real API smoke test (upload → S3 → SQS → real model inference → DynamoDB → poll) and the chat endpoints both verified against the live API; found and fixed a real Lambda Layer packaging bug in the process | ✅ **Deployed and verified** — see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md#6-deploy-aws-backend-optional) |
 | ML inference | Real `.tflite` model loaded and run through `ai-edge-litert` — locally, and for real in the deployed Lambda; tensor shapes/quantization cross-checked against `training_metadata.json` | ✅ Runs correctly — see caveat below |
 | ML pipeline consistency | Class-label order and quantization params cross-checked across firmware headers, backend, and training metadata | ✅ Consistent |
-| ESP32 hardware bring-up simulation | Wokwi simulation, run with a real token | ✅ **Passing** — root cause found (a missing `diagram.json` serial-monitor wiring, not a firmware/environment problem as two earlier attempts suggested) and fixed; real firmware boots and prints a deterministic boot marker, confirmed by `--expect-text`, exit code 0. GitHub Actions workflow created for reproducibility, currently blocked only on a missing `WOKWI_CLI_TOKEN` repo secret — see [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md) |
+| ESP32 hardware bring-up simulation | Wokwi simulation, run with a real token, locally and in GitHub Actions | ✅ **Passing in both** — root cause found (a missing `diagram.json` serial-monitor wiring, not a firmware/environment problem as two earlier attempts suggested) and fixed; real firmware boots and prints a deterministic boot marker, confirmed by `--expect-text`, exit code 0, on this machine and independently on a clean `ubuntu-latest` GitHub Actions runner ([run `32560846142`](https://github.com/FURYBALA/smart-agriculture-system/actions/runs/32560846142)) — see [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md) |
 | Physical ESP32/ESP32-CAM hardware | Flashing and hardware bring-up | ⏳ Pending — no hardware available in the development environment |
 | Flutter web runtime | A real, isolated headless Chromium (via Playwright) actually loading the built app and clicking through all 6 screens | ✅ **Runs correctly** — 0 uncaught exceptions; found and fixed a real bug along the way (History screen's database didn't work at all on web) — see [`docs/flutter-runtime.md`](docs/flutter-runtime.md) |
 | Mobile native runtime | Running on a physical Android/iOS device or emulator | ⏳ Pending — no device/emulator available in the development environment |
@@ -328,9 +328,15 @@ genuinely external is narrower than it used to be:
   the real cause (a missing serial-monitor connection in
   `diagram.json`), and with that fixed, the real compiled firmware
   boots and prints a deterministic marker every time, confirmed by
-  `wokwi-cli --expect-text`. This only ever validates boot/Serial/GPIO
-  behavior in simulation, not real camera, real relay/pump electrical
-  behavior, or real hardware timing — see
+  `wokwi-cli --expect-text` -- both locally and independently in
+  GitHub Actions on a clean `ubuntu-latest` runner
+  ([run `32560846142`](https://github.com/FURYBALA/smart-agriculture-system/actions/runs/32560846142)),
+  so this isn't a result tied to one machine. This only ever validates
+  boot/Serial/GPIO behavior in simulation, not real camera, real
+  relay/pump electrical behavior, real soil sensor accuracy, or real
+  hardware timing/Wi-Fi behavior — and Wokwi has no camera/image-sensor
+  simulation component at all, so ESP32-CAM vision simulation isn't
+  attempted or claimed — see
   [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md) for the full
   history and exactly what is and isn't covered.
 - **Flutter on a physical device or emulator.** No physical Android/iOS

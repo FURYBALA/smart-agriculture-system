@@ -6,11 +6,13 @@ config (`wokwi.toml`) modeling the irrigation node's circuit: an ESP32,
 a DHT sensor, a soil-moisture analog input, and an LED standing in for
 the relay-driven pump.
 
-**Status: PASS.** This is a real, deterministic, reproducible result --
-run repeatedly against Wokwi's real simulation API with a real
-`WOKWI_CLI_TOKEN`, not assumed or guessed. The simulation boots the
-real production firmware and observes a real, expected serial message.
-This took several real investigation passes to get right; the honest
+**Status: PASS, both locally and in GitHub Actions.** This is a real,
+deterministic, reproducible result -- run repeatedly against Wokwi's
+real simulation API with a real `WOKWI_CLI_TOKEN`, not assumed or
+guessed, both on this Windows machine and independently on a clean
+`ubuntu-latest` GitHub Actions runner. The simulation boots the real
+production firmware and observes a real, expected serial message. This
+took several real investigation passes to get right; the honest
 history of each is below, including two passes that ended
 "inconclusive" before the actual root cause was found.
 
@@ -176,22 +178,46 @@ worth simulating. Not attempted, for the same reason as before, now
 confirmed against Wokwi's actual registry rather than assumed from its
 absence in the docs.
 
-## GitHub Actions: workflow created, blocked on a missing secret
+## GitHub Actions: PASS -- run for real, on a clean Ubuntu runner
 
 [`.github/workflows/wokwi-simulation.yml`](../.github/workflows/wokwi-simulation.yml)
 runs the same real compile + `wokwi/wokwi-ci-action@v1` simulation in
-CI (manual `workflow_dispatch` only), so this result isn't tied to one
-person's Windows machine. It is **not yet usable**: this repository has
-no `WOKWI_CLI_TOKEN` secret configured (checked directly with
-`gh secret list` -- only the three AWS secrets exist). Adding it
-requires repository-secret write access this session was explicitly
-told not to use ("Do NOT modify GitHub secrets"), so it wasn't added.
-Once the repository owner adds a `WOKWI_CLI_TOKEN` secret (from
-[wokwi.com's CI dashboard](https://wokwi.com/dashboard/ci)), running
-this workflow should reproduce the same real local result in a clean,
-non-local environment -- at that point it can reasonably become the
-authoritative, always-available version of this test instead of a
-local-machine-only result.
+CI (manual `workflow_dispatch` only). After the repository owner added
+a `WOKWI_CLI_TOKEN` repository secret (from
+[wokwi.com's CI dashboard](https://wokwi.com/dashboard/ci) -- this
+session never saw or handled the token value itself, only confirmed
+via `gh secret list` that the secret now exists), the workflow was
+triggered and monitored to completion for real:
+
+- Run: [`32560846142`](https://github.com/FURYBALA/smart-agriculture-system/actions/runs/32560846142)
+- Result: `success`, in 1m58s, on a fresh `ubuntu-latest` runner --
+  independent of any local machine
+- Real compile: `Sketch uses 939072 bytes (71%) of program storage
+  space.`
+- Real simulation log:
+  ```
+  Connected to Wokwi Simulation API 1.0.0-...
+  Starting simulation...
+  WOKWI_IRRIGATION_READY
+  Expected text found: "WOKWI_IRRIGATION_READY"
+  TEST PASSED.
+  ```
+- Token handling verified directly in the run's own logs: every
+  reference to it (checkout, `setup-arduino-cli`, the Wokwi action
+  itself) is masked as `***` by GitHub's automatic secret redaction --
+  the literal value never appears anywhere in the log output.
+
+This is now the authoritative, reproducible version of this test --
+not tied to one person's Windows machine, and confirming the same real
+result (root-caused config fix + deterministic boot marker) in a
+clean, independent environment.
+
+| | Status |
+|---|---|
+| **Local Wokwi** (Windows, this machine) | PASS |
+| **GitHub Actions Wokwi** (`ubuntu-latest`, run `32560846142`) | PASS |
+| Physical ESP32 | BLOCKED -- no hardware available |
+| ESP32-CAM Wokwi vision simulation | NOT SUPPORTED / NOT AVAILABLE -- Wokwi's parts registry has no camera/image-sensor component (see above) |
 
 ## What it would simulate, and where it's an approximation
 
@@ -260,6 +286,6 @@ arduino-cli compile --fqbn esp32:esp32:esp32 --output-dir build .
 wokwi-cli wokwi --timeout 10000 --expect-text "WOKWI_IRRIGATION_READY" --serial-log-file wokwi-serial.log
 ```
 
-Or, once a `WOKWI_CLI_TOKEN` repository secret exists, trigger
+Or, from the Actions tab, trigger
 [`.github/workflows/wokwi-simulation.yml`](../.github/workflows/wokwi-simulation.yml)
 manually from the Actions tab.

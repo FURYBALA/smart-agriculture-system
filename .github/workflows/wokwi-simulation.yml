@@ -1,13 +1,12 @@
 name: Wokwi simulation (irrigation node)
 
-# Manual-only. This needs a WOKWI_CLI_TOKEN repository secret
-# (https://wokwi.com/dashboard/ci) that does not exist in this repo yet
-# -- running this workflow before that secret is added will fail at the
-# "Run Wokwi simulation" step with an authentication error, not a
-# project defect. See docs/wokwi-simulation.md for the real, local
-# results this config is based on (a genuine root-caused fix, not a
-# guess) and exactly what adding the secret would let this workflow
-# confirm in a reproducible, non-local environment.
+# Manual-only. Needs a WOKWI_CLI_TOKEN repository secret
+# (https://wokwi.com/dashboard/ci) -- now configured and confirmed
+# working: a real triggered run passed on a clean ubuntu-latest runner
+# (compile succeeded, the simulation booted the real firmware, and
+# WOKWI_IRRIGATION_READY was detected). See docs/wokwi-simulation.md
+# for that run's ID and full log excerpts, and the root-caused fix
+# this config is based on.
 
 on:
   workflow_dispatch:
