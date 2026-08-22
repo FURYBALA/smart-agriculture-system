@@ -51,8 +51,14 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Verify AWS_REGION secret matches the fixed deployment region
+        env:
+          # Passed via env, not interpolated into the script with ${{ }},
+          # so the secret's literal text is never substituted directly
+          # into shell code -- the standard hardening GitHub recommends
+          # for any secrets a run: step needs to reference.
+          REGION_SECRET: ${{ secrets.AWS_REGION }}
         run: |
-          if [ "${{ secrets.AWS_REGION }}" != "ap-south-1" ]; then
+          if [ "$REGION_SECRET" != "ap-south-1" ]; then
             echo "AWS_REGION secret does not equal the fixed deployment region ap-south-1 -- aborting before any build/deploy step runs."
             exit 1
           fi
