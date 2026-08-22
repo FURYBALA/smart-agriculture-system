@@ -427,6 +427,7 @@ generic list:
 | [`docs/final-interview-preparation.md`](docs/final-interview-preparation.md) | 50 questions across 25 categories, with follow-ups |
 | [`docs/final-release-status.md`](docs/final-release-status.md) | The single source of truth: every component's PASS/IMPLEMENTED/SIMULATED/BLOCKED/NOT SUPPORTED/INCONCLUSIVE status |
 | [`docs/release-checklist.md`](docs/release-checklist.md) | Checkbox-by-checkbox release readiness, evidence-based |
+| [`docs/interview-cheat-sheet.md`](docs/interview-cheat-sheet.md) | One-page summary + top 15 Q&A |
 | [`docs/final-validation-matrix.md`](docs/final-validation-matrix.md) | Every component's real status: PASS / SIMULATED / BLOCKED / NOT SUPPORTED |
 | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Full start-from-zero setup, every component |
 | [`docs/end-to-end-test-plan.md`](docs/end-to-end-test-plan.md) | The complete test matrix, per test case |
