@@ -1,11 +1,20 @@
 # Backend local testing
 
 No Docker and no AWS account/credentials are available on this project's
-local (Windows) dev machine, so `sam local start-api` can't run there and
-deployment has never been attempted. This documents what was actually
-exercised instead -- locally, and in CI where GitHub's runners have
-capabilities (Docker) the local machine doesn't -- and exactly why the
-remaining pieces weren't.
+local (Windows) dev machine, so `sam local start-api` can't run there.
+This documents what was actually exercised locally and in CI, where
+GitHub's runners have capabilities (Docker) the local machine doesn't --
+and exactly why the remaining pieces weren't, at the local/CI layer.
+
+The backend has since been **actually deployed to a real AWS account**
+via a separate, manual GitHub Actions workflow -- that real-AWS
+evidence (live API Gateway, real Lambda execution, real DynamoDB
+writes) lives in
+[`docs/DEPLOYMENT.md`](DEPLOYMENT.md#deployed-instance) and
+[`backend/README.md`](../backend/README.md#deployed-instance), not
+here. This document is scoped to what local/CI testing alone proved,
+without a real AWS account, which is a real and still-relevant category
+distinct from the deployment evidence.
 
 ## A real dependency bug found and fixed along the way
 
@@ -117,17 +126,27 @@ for the complete stack is now real, CI-verified evidence, not a
 documented-but-unexercised claim -- check the workflow's latest run to
 confirm it's still current.
 
-## What was NOT verified, anywhere
+## What was NOT verified locally or in CI, but has since been verified against real AWS
 
-- `sam local start-api` / actual Lambda execution behind a real (or
-  Docker-simulated) API Gateway
+- Real Lambda execution behind a real API Gateway
 - Real API Gateway request/response mapping
-- Real IAM permissions
-- Anything requiring an actual AWS account (`sam deploy`)
+- The full deploy path (`sam deploy` against a real account)
+
+These are now covered by the real deployment (`docs/DEPLOYMENT.md`,
+`backend/README.md`) -- included here only so this document doesn't read
+as still-current on those specific points.
+
+## What remains unverified, period
+
+- `sam local start-api` specifically (Docker-simulated API Gateway) --
+  superseded by testing against the real deployed API instead, never
+  run itself
+- IAM policies' tight-scoping (the deploy succeeded with the configured
+  policies; whether they're minimal, not just sufficient, wasn't
+  separately audited)
 - The model's prediction *accuracy* on any real leaf photo in this
   specific test run (real accuracy is `docs/dataset.md`'s domain, using
   real PlantVillage images, not this pipeline-wiring test's synthetic
   one)
 
-See [`backend/README.md`](../backend/README.md) for what deploying for
-real requires.
+See [`backend/README.md`](../backend/README.md) for deployment details.

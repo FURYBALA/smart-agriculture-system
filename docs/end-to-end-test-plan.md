@@ -21,6 +21,7 @@ an AWS account are marked **BLOCKED**, never PASS.
 | H8 | Manual pump override is never cut off by the safety timer | Pump started via `/pump/on` keeps running past `PUMP_RUN_MS` until explicit `/pump/off` | Host test asserts this exact property (`pumpStartedByAuto` tracking) — CI VALIDATION | LOGIC VERIFIED — real relay behavior BLOCKED |
 | H9 | Cooldown prevents back-to-back waterings | A second AUTO start attempt within `PUMP_COOLDOWN_MS` of the last finish is refused | Host test (`canStartPump`) — CI VALIDATION | LOGIC VERIFIED — real timing BLOCKED |
 | H10 | ESP32-CAM captures a frame | `esp_camera_fb_get()` returns a valid framebuffer | — | BLOCKED — hardware required |
+| H11 | Irrigation node boots and connects to Wi-Fi in Wokwi simulation | Serial shows Wi-Fi connect, then "REST API server started." | Actually run with a real token: found and fixed 2 real config bugs (invalid pin names, missing required `firmware` field); with those fixed, `wokwi-cli` connects to the real API and starts a session but never completes — confirmed not a firmware issue via an independent trivial sanity-sketch test that fails identically | ATTEMPTED (real API, real token) — INCONCLUSIVE, see `wokwi-simulation.md` |
 
 ## Vision
 
@@ -46,7 +47,7 @@ an AWS account are marked **BLOCKED**, never PASS.
 | M6 | App handles an unreachable device | Timeout after 5s, readable error shown, no crash | `pingIrrigationNode`/`pingVisionNode` return false on failure; exercised by the connectivity-check pattern, not observed against a truly offline device in a running app | LOCAL/UNIT TESTING — full runtime behavior BLOCKED |
 | M7 | History screen shows past diagnoses and sensor snapshots | List renders saved entries, pull-to-refresh works | `sqflite` round-trip tests pass (model serialization); full screen render on a device/emulator not observed | CI VALIDATION (data layer only) — screen rendering BLOCKED |
 | M8 | App launches and all 6 tabs render on a physical device or emulator | App opens, navigation works, no crash | Widget smoke test confirms the shell builds in a test harness; never launched on a real device, emulator, or observed in a browser (a headless-browser attempt did not produce an isolated render — see `flutter-runtime.md`) | BLOCKED — device/emulator/observable browser required |
-| M9 | Release APK builds successfully | `flutter build apk --release` produces an installable APK | Not run in this environment (incomplete Android SDK — missing `cmdline-tools`, licenses) | BLOCKED — complete Android SDK required |
+| M9 | Release APK builds successfully | `flutter build apk --release` produces an installable APK | Runs for real — a 20.7 MB `app-release.apk` produced, after fixing a real Gradle 7→8/Kotlin/JDK 21 mismatch (see `flutter-runtime.md`) | LOCAL BUILD — PASS (installing/running it is separately BLOCKED, no device/emulator) |
 | M10 | App compiles for web | `flutter build web` succeeds | Passing, locally and in CI | CI VALIDATION |
 
 ## Backend
@@ -58,14 +59,14 @@ an AWS account are marked **BLOCKED**, never PASS.
 | B3 | API response for a pending/complete/failed diagnosis | `GET /diagnose/{id}` returns the correct shape for each state | `results_handler` tested against all three states directly | SIMULATED TESTING |
 | B4 | Corrupt image doesn't leave a diagnosis stuck "pending" forever | A failed inference writes an explicit `status: "failed"` record | Verified — `_run_one()` raises on a corrupt image, `handler()`'s try/except is what converts that to the failed-status write | LOCAL TESTING (the raise; the catch-and-write itself is existing reviewed code, not separately re-tested this pass) |
 | B5 | Deployment package builds correctly, including the model-inference function | `sam build --use-container` succeeds for the full stack | Confirmed via real CI log: `Build Succeeded` for `InferenceHandlerFunction` specifically | CI VALIDATION (real Docker) |
-| B6 | Real deployed API responds correctly | `curl` against a real `ApiUrl` returns expected shapes | Not run — no AWS account/credentials available | BLOCKED — AWS account required |
-| B7 | IAM policies actually restrict access as configured | Each function can only touch its own bucket/queue/table | SAM policy templates configured; not verified against real AWS IAM behavior | BLOCKED — real AWS deployment required |
+| B6 | Real deployed API responds correctly | `curl` against a real `ApiUrl` returns expected shapes | **Run for real** against `https://p17huf2s49.execute-api.ap-south-1.amazonaws.com/prod/`: `POST /diagnose` → `202` + `diagnosisId`; polled `GET /diagnose/{id}` → `complete` with real class + confidence; `POST`/`GET /chat/{sessionId}` round-tripped correctly. Found and fixed a real Lambda Layer bug in the process (see `docs/DEPLOYMENT.md#deployed-instance`) | AWS DEPLOYMENT VALIDATION — PASS |
+| B7 | IAM policies actually restrict access as configured | Each function can only touch its own bucket/queue/table | SAM policy templates configured and the stack deployed successfully with them; whether they're maximally *tight* (vs. merely sufficient) wasn't separately audited | AWS DEPLOYMENT VALIDATION (deploy succeeded) — tight-scoping audit NOT EXECUTED |
 
 ## End-to-end
 
 | # | Flow | Expected result | Actual result | Status |
 |---|---|---|---|---|
-| E1 | Camera → ML → backend → database → Flutter | A photo taken on-device flows through the full cloud pipeline and the result appears in the app | Each hop verified independently (V3/V4, B1–B4, M1–M4); never observed as one continuous physical flow | BLOCKED — hardware + device + AWS deployment all required together |
+| E1 | Camera → ML → backend → database → Flutter | A photo taken on-device flows through the full cloud pipeline and the result appears in the app | The backend half is now real end-to-end (B6: API → S3 → SQS → real inference → DynamoDB → poll, against the live deployment). The camera-capture and Flutter-UI halves are still each independently unverified — no ESP32-CAM hardware, no observed app runtime | AWS half: PASS. Hardware + device halves: BLOCKED |
 | E2 | Sensor → ESP32 → Flutter → irrigation control | A real soil reading drives an app-displayed value, and an app command drives a real pump | Simulated version of this flow passes (M1, M3); real version needs real hardware | SIMULATED TESTING — real flow BLOCKED |
 | E3 | Full system CI green simultaneously | Firmware, Flutter, and Backend CI all pass on the same commit | Confirmed — see root README badges / `gh run list` | CI VALIDATION |
 

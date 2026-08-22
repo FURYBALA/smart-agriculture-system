@@ -4,9 +4,46 @@ Matches the cloud architecture in the project report's Figure 3.3:
 API Gateway -> S3 (image storage) -> SQS -> Lambda inference ->
 DynamoDB (results + chat history), defined as an AWS SAM template.
 
-**Not deployed.** This is real, deployable infrastructure-as-code, not
-a mockup -- but nobody has run `sam deploy` on it. Deploying creates
-billable AWS resources (Lambda, API Gateway, S3, DynamoDB, SQS).
+**Deployed and verified.** This backend was actually deployed to AWS
+(account `273422285791`, region `ap-south-1`, CloudFormation stack
+`smart-agriculture-system`, via a one-off manual GitHub Actions
+workflow -- see [`docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md#deployed-instance)
+for the full record). All 21 resources reached `CREATE_COMPLETE`, and a
+real end-to-end smoke test -- upload → S3 → SQS → real INT8 model
+inference → DynamoDB → poll → `complete` -- succeeded against the live
+API, along with the chat endpoints. Deploying your own copy still
+creates billable AWS resources in your account; the steps below are
+unchanged and still apply for that.
+
+## Deployed instance
+
+| | |
+|---|---|
+| AWS account | `273422285791` |
+| Region | `ap-south-1` |
+| Stack name | `smart-agriculture-system` |
+| Deployed via | [`.github/workflows/deploy-aws.yml`](../.github/workflows/deploy-aws.yml) (manual `workflow_dispatch` only -- never runs automatically) |
+| API base URL | `https://p17huf2s49.execute-api.ap-south-1.amazonaws.com/prod/` |
+| Stack status | `UPDATE_COMPLETE`, all 21 resources `CREATE_COMPLETE` |
+| Real smoke test | `POST /diagnose` with a synthetic test image → `202` with a `diagnosisId` → polled `GET /diagnose/{id}` → `complete` with a real class + confidence from the actual deployed model. `POST`/`GET /chat/{sessionId}` also verified round-tripping through DynamoDB. |
+
+A real deployment bug was found and fixed in the process: the first
+deploy attempt's Lambda functions all failed at import with
+`No module named 'common'`. The `CommonLayer`'s source had a `python/`
+subfolder already (the correct Lambda Layer convention on its own), but
+`Metadata: BuildMethod: python3.12` made SAM's builder wrap it in
+*another* `python/` prefix during build -- confirmed by downloading and
+inspecting the actual deployed layer zip
+(`python/python/common.py`, not importable). Fixed by moving
+`common.py` up a level so the build step's own prefixing produces the
+correct path; this was invisible to all local/CI tests because they
+add the layer's source directly to `sys.path`, bypassing SAM's build
+step entirely.
+
+This deployment is not automatically kept in sync with future code
+changes -- re-run the workflow (or `sam build --use-container && sam
+deploy`) after changing backend code if you want the deployed version
+to match.
 
 ## Why this exists alongside Gemini Vision
 

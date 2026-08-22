@@ -125,10 +125,39 @@ Skip this entirely if you're using the app's default Gemini-direct
 diagnosis path. Full procedure with all commands:
 [`backend/README.md`](../backend/README.md).
 
-**Status: CI VALIDATION** (`sam validate`, a full containerized
-`sam build` including the model-inference function, all pass in CI)
-**+ SIMULATED TESTING** (real Lambda handler code against
-`moto`-mocked AWS) — **not deployed**. Short version:
+**Status: AWS DEPLOYMENT VALIDATION.** This backend has actually been
+deployed and exercised against real AWS — not just built.
+
+### Deployed instance
+
+| | |
+|---|---|
+| Account / region | `273422285791` / `ap-south-1` |
+| Stack | `smart-agriculture-system` (`UPDATE_COMPLETE`, 21/21 resources `CREATE_COMPLETE`) |
+| Deployed via | [`.github/workflows/deploy-aws.yml`](../.github/workflows/deploy-aws.yml), a manual-only (`workflow_dispatch`) GitHub Actions workflow — chosen specifically because GitHub's runners have Docker and this project's local dev machine doesn't, and `sam build --use-container` needs it for the model-inference function's native dependencies |
+| API base URL | `https://p17huf2s49.execute-api.ap-south-1.amazonaws.com/prod/` |
+| Verified | `POST /diagnose` (synthetic test image) → real S3 object → real SQS message → real `ai-edge-litert` inference against the actual shipped model → real DynamoDB write → polled to `complete` via `GET /diagnose/{id}`. `POST`/`GET /chat/{sessionId}` verified the same way. CloudWatch logs checked clean (no errors) across all four functions. |
+
+One real deployment bug was found and fixed along the way: the Lambda
+Layer's Python module wasn't importable
+(`No module named 'common'`) due to a `python/` prefix being applied
+twice — once already present in the source, once added by SAM's build
+step. Confirmed by downloading and inspecting the actual deployed layer
+zip, not guessed. Fixed by moving the source up one level; see
+[`backend/README.md`](../backend/README.md#deployed-instance) for the
+full explanation. This is exactly the class of bug that can only
+surface from a real deployment — every local/CI test bypasses SAM's
+actual layer-build step by adding the source directly to `sys.path`.
+
+**What this does NOT prove:** anything about the ESP32 firmware's REST
+calls actually reaching this API (the firmware doesn't call this
+backend at all — see the architecture diagram), or the app's UI layer
+(the mobile app's primary diagnosis path calls Gemini Vision directly
+and has no code wired to this backend's URL today, unchanged by this
+deployment). This deployment also isn't kept continuously in sync with
+future commits — it reflects the code as of commit `d10504a`.
+
+Short version to deploy your own copy:
 
 ```bash
 cp ml/models/tomato_disease_model_int8.tflite backend/lambda_functions/inference_handler/

@@ -163,9 +163,9 @@ still does.
 | ESP32 REST contract | [`mobile_app/tool/esp32_simulator_lib.dart`](mobile_app/tool/esp32_simulator_lib.dart) serves the exact same JSON/status codes as both real nodes | The real, unmodified `Esp32Service` talking to it over real loopback HTTP — [`docs/simulation.md`](docs/simulation.md) |
 | Backend Lambda handlers | [`backend/tests/test_lambda_handlers_local.py`](backend/tests/test_lambda_handlers_local.py), `moto`-mocked S3/SQS/DynamoDB | Real request validation/serialization/error handling in `upload_handler`, `results_handler`, `chat_handler` — [`docs/backend-local-testing.md`](docs/backend-local-testing.md) |
 | ML inference | Same test file, real `ai-edge-litert` interpreter loading the actual shipped `.tflite` model | Input/output tensor shapes and quantization match `training_metadata.json`; a full S3→preprocess→invoke→DynamoDB run returns a valid class + confidence |
-| Backend deployment packaging | `sam validate` + `sam build --use-container` in CI (real Docker) | The full stack, including the model-inference function, builds cleanly — not just documented as "should work" |
+| Backend deployment | `sam validate` + `sam build --use-container` in CI, then a real `sam deploy` via a manual GitHub Actions workflow | **Deployed for real** to `ap-south-1` — 21/21 resources `CREATE_COMPLETE`, a live API smoke test passing end-to-end |
 | Flutter web | `flutter build web` in CI | The app's non-platform-specific code compiles cleanly — see [`docs/flutter-runtime.md`](docs/flutter-runtime.md) for what this does and doesn't prove |
-| ESP32 hardware bring-up simulation | [Wokwi](https://wokwi.com) config for the irrigation node | Config exists; **not executed** (no Wokwi account/token here) — see [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md) |
+| ESP32 hardware bring-up simulation | [Wokwi](https://wokwi.com) config for the irrigation node, run with a real token against Wokwi's real API | ⚠️ Attempted for real — found and fixed 2 config bugs, but the simulation itself connects and then stalls with no output (ruled out as a firmware issue via a trivial sanity-sketch test); see [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md) for the full diagnosis |
 
 ## ML model
 
@@ -243,13 +243,14 @@ confusion-matrix root-cause analysis:
 | Firmware (both nodes) | Compiled in CI (`arduino-cli`) against real ESP32 board definitions on every push | ✅ Build-verified |
 | Firmware logic | Hardware-independent pump/threshold/RGB565/quantization math, host-tested with `g++` in CI | ✅ Logic-verified |
 | Flutter app | `flutter analyze` (clean) + `flutter test` (19 tests, including a real ESP32-simulator integration test) + `flutter build web` in CI | ✅ Passing |
-| Backend (Lambda / SAM) | `sam validate`, `sam build --use-container` (real Docker, full stack) in CI; real handler code run against `moto`-mocked AWS (19 `pytest` tests) | ✅ Locally verified — not deployed |
-| ML inference | Real `.tflite` model loaded and run through `ai-edge-litert`; tensor shapes/quantization cross-checked against `training_metadata.json` | ✅ Runs correctly — see caveat below |
+| Flutter release APK | `flutter build apk --release` — locally, not CI (needs a full Android SDK) | ✅ Builds a real, installable 20.7 MB APK, after fixing a real Gradle 7→8/Kotlin/JDK 21 mismatch |
+| Backend (Lambda / SAM) | `sam validate`, `sam build --use-container` (real Docker, full stack) in CI; real handler code run against `moto`-mocked AWS (19 `pytest` tests) | ✅ Locally verified |
+| **AWS deployment** | **Deployed for real** via a manual GitHub Actions workflow (`ap-south-1`, stack `smart-agriculture-system`) — all 21 resources `CREATE_COMPLETE`; a real API smoke test (upload → S3 → SQS → real model inference → DynamoDB → poll) and the chat endpoints both verified against the live API; found and fixed a real Lambda Layer packaging bug in the process | ✅ **Deployed and verified** — see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md#6-deploy-aws-backend-optional) |
+| ML inference | Real `.tflite` model loaded and run through `ai-edge-litert` — locally, and for real in the deployed Lambda; tensor shapes/quantization cross-checked against `training_metadata.json` | ✅ Runs correctly — see caveat below |
 | ML pipeline consistency | Class-label order and quantization params cross-checked across firmware headers, backend, and training metadata | ✅ Consistent |
-| ESP32 hardware bring-up | Wokwi simulation config | 📝 Config only — not executed (no Wokwi account) |
+| ESP32 hardware bring-up | Wokwi simulation, run with a real token | ⚠️ Attempted — connects to the real API, stalls before completing; not a firmware defect (ruled out) |
 | Physical ESP32/ESP32-CAM hardware | Flashing and hardware bring-up | ⏳ Pending — no hardware available in the development environment |
 | Mobile runtime | Running on a physical device/emulator | ⏳ Pending — no device/emulator available in the development environment |
-| AWS deployment | `sam deploy` | ⏳ Pending — no AWS credentials/account available |
 
 "Build-verified," "logic-verified," and "locally verified" are
 deliberately not written as "tested on hardware" or "deployed" — see
@@ -293,17 +294,17 @@ Each component also has its own focused setup doc:
   ```bash
   dart run tool/esp32_simulator.dart
   ```
-- **Backend** (optional, not deployed): [`backend/README.md`](backend/README.md)
-  — `sam build --use-container && sam deploy --guided`, requires your
-  own AWS account and credentials. Local testing without either
-  (`pytest`, real handler code, `moto`-mocked AWS):
-  [`docs/backend-local-testing.md`](docs/backend-local-testing.md).
+- **Backend** (optional — the app's default diagnosis path doesn't need it): [`backend/README.md`](backend/README.md)
+  — already deployed once for real, see below; `sam build --use-container && sam deploy --guided`
+  deploys your own copy, requires your own AWS account and credentials.
+  Local testing without either (`pytest`, real handler code,
+  `moto`-mocked AWS): [`docs/backend-local-testing.md`](docs/backend-local-testing.md).
 
 ## External validation
 
 Everything above was verified through compilation, static analysis,
-and automated tests in the development environment. Three things were
-not, because the required resources weren't available there:
+and automated tests in the development environment — plus, as of this
+pass, a real AWS deployment. Two things remain genuinely external:
 
 - **ESP32 / ESP32-CAM hardware.** No physical board was available, so
   neither node has been flashed or bring-up tested. Firmware compiling
@@ -311,25 +312,36 @@ not, because the required resources weren't available there:
   behaving correctly on real hardware (sensors, relay wiring, camera,
   Wi-Fi, timing) is not — go through
   [`docs/bring-up-checklist.md`](docs/bring-up-checklist.md) before a
-  first flash rather than assuming it. A Wokwi simulation config exists
-  for the irrigation node but hasn't been run either (no Wokwi account
-  here) — [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md).
-- **Flutter on a real device or emulator.** No Android/iOS
-  device/emulator was available, and the Android SDK/Windows desktop
-  toolchain here are both incomplete. `flutter analyze`, `flutter test`
-  (including a real ESP32-simulator integration test), and
-  `flutter build web` all pass — but the app has never actually been
-  launched and watched render on any device or in a browser. See
+  first flash rather than assuming it. A Wokwi simulation for the
+  irrigation node was actually attempted with a real token against
+  Wokwi's real API — it found and fixed two real config bugs, then
+  connects successfully but stalls before completing, for reasons
+  confirmed unrelated to this project's firmware (a trivial sanity
+  sketch fails identically) — see
+  [`docs/wokwi-simulation.md`](docs/wokwi-simulation.md) for the full,
+  honest diagnosis.
+- **Flutter on a real device or emulator.** No physical device or
+  emulator was available. `flutter analyze`, `flutter test` (including
+  a real ESP32-simulator integration test), `flutter build web`, and
+  `flutter build apk --release` all pass — the last one only after
+  fixing a real Gradle/Kotlin/JDK version mismatch in the Android build
+  config — but the resulting APK has never actually been installed and
+  watched run on a device or emulator, and the app has never been
+  observed rendering in a browser either. See
   [`docs/flutter-runtime.md`](docs/flutter-runtime.md) for exactly what
   was and wasn't checked, including an open question about whether
   `HistoryScreen` fails gracefully or crashes on web (predicted, not
   observed).
-- **AWS deployment.** No AWS account/credentials were available.
-  `backend/` is real, deployable SAM infrastructure — `sam build
-  --use-container` for the complete stack (including the model
-  inference function) succeeds in CI — but `sam deploy` has never been
-  run against it. See [`backend/README.md`](backend/README.md) for what
-  another engineer with credentials would need to deploy it.
+**AWS deployment is no longer on this list** — the backend is deployed
+and verified for real (stack `smart-agriculture-system`, `ap-south-1`):
+see [`backend/README.md`](backend/README.md#deployed-instance) and
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md#deployed-instance) for the
+account, the live API URL, exactly what was checked, and a real bug
+that deployment found and fixed (a doubly-nested Lambda Layer path that
+no local test could have caught). What that deployment does *not*
+prove: the firmware doesn't call this API at all (see the architecture
+diagram), and the mobile app's own diagnosis path still calls Gemini
+Vision directly, unchanged.
 
 ## License
 
